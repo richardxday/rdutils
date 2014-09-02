@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "strsup.h"
-#include "StdFile.h"
-#include "DateTime.h"
+#include <rdlib/strsup.h>
+#include <rdlib/StdFile.h>
+#include <rdlib/DateTime.h>
 
-int main(int argc, char *argv[])
+int main(void)
 {
 	AStdData  *fp = Stdin;
 	AStdFile  ofp;

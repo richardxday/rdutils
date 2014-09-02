@@ -1,10 +1,10 @@
 
 #include <stdio.h>
 
-#include "StdUri.h"
-#include "StdSocket.h"
-#include "SocketServer.h"
-#include "QuitHandler.h"
+#include <rdlib/StdUri.h>
+#include <rdlib/StdSocket.h>
+#include <rdlib/SocketServer.h>
+#include <rdlib/QuitHandler.h>
 
 AQuitHandler QuitHandler;
 

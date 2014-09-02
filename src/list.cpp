@@ -4,8 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "Recurse.h"
-#include "QuitHandler.h"
+#include <rdlib/Recurse.h>
+#include <rdlib/QuitHandler.h>
 
 /* end of includes */
 
@@ -451,7 +451,12 @@ int main(int argc, char *argv[])
 		else if (strcmp(argv[i], "-F")    == 0) footer = AString(argv[++i]).DeEscapify();
 		else if (strcmp(argv[i], "-html") == 0) {html = true; wml  = false; title = argv[++i];}
 		else if (strcmp(argv[i], "-wml")  == 0) {wml  = true; html = false; title = argv[++i];}
-		else if (strcmp(argv[i], "-cd")   == 0) chdir(argv[++i]);
+		else if (strcmp(argv[i], "-cd")   == 0) {
+			if (chdir(argv[++i]) != 0) {
+				fprintf(stderr, "Failed to change directory to '%s'", argv[i]);
+				exit(1);
+			}
+		}
 		else if (strcmp(argv[i], "-lf")   == 0) context.bAutoLineFeed = false;
 		else if (strcmp(argv[i], "-i")    == 0) context.Index = (uint_t)AString(argv[++i]);
 		else {

@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "strsup.h"
-#include "Recurse.h"
-#include "Regex.h"
-#include "QuitHandler.h"
+#include <rdlib/strsup.h>
+#include <rdlib/Recurse.h>
+#include <rdlib/Regex.h>
+#include <rdlib/QuitHandler.h>
 
 /* end of includes */
 
@@ -102,13 +102,11 @@ static void GrepFile(const char *filename, FILE *fp, GREP_CONTEXT *p)
 	uint_t ln = 1, n = 0, MaxLines = p->MaxLines, ContextLines = p->ContextLines, i;
 
 	while (readln(fp, lines, n, ContextLines)) {
-		bool linematched = false;
-
 		if ((( bRegEx && MatchRegex(lines, Pattern, bCase, EscapeChar)) ||
 			 (!bRegEx &&  bCase && (lines.Pos(Pattern) >= 0)) ||
 			 (!bRegEx && !bCase && (lines.PosNoCase(Pattern) >= 0))) != bNonMatching) {
 			p->LineMatches++;
-			linematched = matched = true;
+			matched = true;
 
 			if (bShowFilenameOnly) {
 				printf("%s\n", filename);
