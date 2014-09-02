@@ -40,4 +40,4 @@ pingchecker_CPPFLAGS =							\
 
 pingchecker_SOURCES = pingchecker.cpp
 
-DISTCLEANFILES = rdutils-stdint.h
+DISTCLEANFILES =
