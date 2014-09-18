@@ -1,5 +1,6 @@
 bin_PROGRAMS =									\
 	agrep										\
+	imagediff									\
 	list										\
 	pingchecker									\
 	uri2uri
@@ -39,5 +40,14 @@ pingchecker_CPPFLAGS =							\
 	$(RDUTILS_CFLAGS)
 
 pingchecker_SOURCES = pingchecker.cpp
+
+imagediff_LDADD =								\
+	$(RDLIB_LIBS)
+
+imagediff_CPPFLAGS =							\
+	$(RDLIB_CFLAGS)								\
+	$(RDUTILS_CFLAGS)
+
+imagediff_SOURCES = imagediff.cpp
 
 DISTCLEANFILES =
