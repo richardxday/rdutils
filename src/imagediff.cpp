@@ -9,10 +9,14 @@
 #include <rdlib/DataList.h>
 #include <rdlib/BMPImage.h>
 #include <rdlib/DateTime.h>
+#include <rdlib/jpeginfo.h>
+#include <rdlib/SettingsHandler.h>
+#include <rdlib/QuitHandler.h>
 
 typedef struct {
-	ARect			   rect;
-	std::vector<float> data;
+	AString	filename;
+	AImage	image;
+	ARect	rect;
 } IMAGE;
 
 static void __DeleteImage(uptr_t item, void *context)
@@ -24,83 +28,28 @@ static void __DeleteImage(uptr_t item, void *context)
 
 IMAGE *CreateImage(const char *filename, const IMAGE *img0)
 {
-	AImage image;
-	IMAGE  *img = NULL;
+	IMAGE *img = NULL;
 
-	if (image.LoadJPEG(filename)) {
-		if ((img = new IMAGE) != NULL) {
-			img->rect = image.GetRect();
+	if ((img = new IMAGE) != NULL) {
+		JPEG_INFO info;
+		AImage& image = img->image;
 
-			if (!img0 || (img->rect == img0->rect)) {
-				const AImage::PIXEL *pixel = image.GetPixelData();
-				float *ptr, *endptr, *p;
-				float *yavg, *yp;
-				uint_t x, y, w = img->rect.w, h = img->rect.h, len = w * h * 3;
-				double avg[3], sd[3];
-				const float yascl = 1.f / (float)w;
-
-				img->data.resize(len + h * 3);
-				ptr    = &img->data[0];
-				endptr = ptr + len;
-				yavg   = endptr;
-
-				memset(ptr, 0, img->data.size() * sizeof(*ptr));
-
-				for (y = 0, p = ptr, yp = yavg; y < h; y++, yp += 3) {
-					for (x = 0; x < w; x++, p += 3, pixel++) {
-						p[0]   = (float)pixel->r;
-						p[1]   = (float)pixel->g;
-						p[2]   = (float)pixel->b;
-						yp[0] += p[0];
-						yp[1] += p[1];
-						yp[2] += p[2];
-					}
-				}
-
-				memset(avg, 0, sizeof(avg));
-				memset(sd,  0, sizeof(sd));
-
-				for (y = 0, yp = yavg, p = ptr; y < h; y++, yp += 3) {
-					yp[0] *= yascl;
-					yp[1] *= yascl;
-					yp[2] *= yascl;
-
-					for (x = 0; x < w; x++, p += 3) {
-						p[0]   -= yp[0];
-						p[1]   -= yp[1];
-						p[2]   -= yp[2];
-
-						avg[0] += p[0];
-						avg[1] += p[1];
-						avg[2] += p[2];
-
-						sd[0]  += p[0] * p[0];
-						sd[1]  += p[1] * p[1];
-						sd[2]  += p[2] * p[2];
-					}
-				}
-
-				double scl = 1.0 / (double)len;
-				for (y = 0; y < 3; y++) {
-					avg[y] *= scl;
-					sd[y]   = sqrt(sd[y] * scl - avg[y] * avg[y]);
-					if (sd[y] == 0.0) sd[y] = 1.0;
-					else			  sd[y] = 1.0 / sd[y];
-				}
-
-				for (p = ptr, y = 0; p < endptr; p++, y = (y + 1) % 3) {
-					p[0] = (p[0] - avg[y]) * sd[y];
-				}
-			}
-			else {
+		if (ReadJPEGInfo(filename, info) && image.LoadJPEG(filename)) {
+			img->filename = filename;
+			img->rect     = image.GetRect();
+			
+			if (img0 && (img->rect != img0->rect)) {
 				fprintf(stderr, "Image in file '%s' is %d x %d and not %d x %d\n", filename, img->rect.w, img->rect.h, img0->rect.w, img0->rect.h);
 				delete img;
 				img = NULL;
 			}
 		}
-	}
-	else {
-		fprintf(stderr, "Failed to load image from file '%s'\n", filename);
+		else {
+			fprintf(stderr, "Failed to load image from file '%s'\n", filename);
+			remove(filename);
+			delete img;
+			img = NULL;
+		}
 	}
 
 	return img;
@@ -108,77 +57,137 @@ IMAGE *CreateImage(const char *filename, const IMAGE *img0)
 
 int main(int argc, char *argv[])
 {
+	AQuitHandler     quithandler;
+	ASettingsHandler stats("imagediff", 5000);
 	ADataList imglist;
-	IMAGE  *img;
-	double factor = 3.0;
-	bool   detection = false;
-	int    i;
+	IMAGE     *img;
+	double    diffavg 	= (double)stats.Get("avg", "0.0");
+	double    diffsd  	= (double)stats.Get("sd", "0.0");
+	double    coeff     = (double)stats.Get("coeff", "1.0e-3");
+	double    factor    = (double)stats.Get("factor", "2.0");
+	double    threshold = (double)stats.Get("threshold", "4000.0");
+	int    	  i;
 
 	imglist.SetDestructor(&__DeleteImage);
 
 	for (i = 1; i < argc; i++) {
+		stats.CheckWrite();
+
+		if (quithandler.HasQuit()) break;
+
 		if (argv[i][0] == '-') {
-			if (strcmp(argv[i], "-factor") == 0) factor = (double)AString(argv[++i]);
 		}
 		else if ((img = CreateImage(argv[i], (const IMAGE *)imglist[0])) != NULL) {
 			imglist.Add(img);
-		}
-	}
+			
+			if (imglist.Count() == 2) {
+				IMAGE *img1 = (IMAGE *)imglist[0];
+				IMAGE *img2 = (IMAGE *)imglist[1];
+				const AImage::PIXEL *pix1 = img1->image.GetPixelData();
+				const AImage::PIXEL *pix2 = img2->image.GetPixelData();
+				const ARect& rect = img1->rect;
+				std::vector<float> data;
+				float *ptr, *p;
+				double avg[3];
+				uint_t x, y, w = rect.w, h = rect.h, w3 = w * 3, len = w * h, len3 = w3 * h, c;
+				
+				data.resize(len3);
+				ptr = &data[0];
 
-	if (imglist.Count() > 1) {
-		IMAGE **images = (IMAGE **)imglist.List();
-		const ARect& rect = images[0]->rect;
-		uint_t len = rect.w * rect.h * 3;
-		float  *ptr = &images[0]->data[0], *endptr = ptr + len, *p;
-		uint_t i, n = imglist.Count() - 1;
+				memset(avg, 0, sizeof(avg));
 
-		for (i = 1; i < n; i++) {
-			const float *ptr2 = &images[i]->data[0], *p2;
+				for (y = 0, p = ptr; y < h; y++) {
+					double yavg[3];
 
-			for (p = ptr, p2 = ptr2; p < endptr; p++, p2++) p[0] += p2[0];
-		}
+					memset(yavg, 0, sizeof(yavg));
 
-		if (n > 1) {
-			float scl = 1.f / (float)n;
-			for (p = ptr; p < endptr; p++) p[0] *= scl;
-		}
+					for (x = 0; x < w; x++, p += 3, pix1++, pix2++) {
+						p[0] 	 = (float)pix1->r - (float)pix2->r;
+						p[1] 	 = (float)pix1->g - (float)pix2->g;
+						p[2] 	 = (float)pix1->b - (float)pix2->b;
 
-		{
-			const float *ptr2 = &images[i]->data[0], *p2;
-			double sum = 0.0;
+						yavg[0] += p[0];
+						yavg[1] += p[1];
+						yavg[2] += p[2];
+					}
 
-			for (p = ptr, p2 = ptr2; p < endptr; p++, p2++) {
-				p[0] = (p[0] - p2[0]) * factor;
-				sum += p[0] * p[0];
-			}
+					yavg[0] /= (double)w;
+					yavg[1] /= (double)w;
+					yavg[2] /= (double)w;
 
-			sum = sqrt(sum / (double)len);
-			detection = (sum >= 1.0);
-			fprintf(stderr, "Diff = %0.6lf\n", sum);
-		}
+					p -= 3 * w;
 
-		if (detection) {
-			AImage img;
-			if (img.Create(rect.w, rect.h)) {
-				AImage::PIXEL *pixel = img.GetPixelData();
-
-				for (p = ptr; p < endptr; p += 3, pixel++) {
-					pixel->r = (uint8_t)LIMIT(127.5 + 127.5 * p[0], 0.0, 255.0);
-					pixel->g = (uint8_t)LIMIT(127.5 + 127.5 * p[1], 0.0, 255.0);
-					pixel->b = (uint8_t)LIMIT(127.5 + 127.5 * p[2], 0.0, 255.0);
+					for (x = 0; x < w; x++, p += 3) {
+						p[0] -= yavg[0]; avg[0] += p[0];
+						p[1] -= yavg[1]; avg[1] += p[1];
+						p[2] -= yavg[2]; avg[2] += p[2];
+					}
 				}
 
-				const TAG tags[] = {
-					{AImage::TAG_JPEG_QUALITY, 95},
-					{TAG_DONE},
-				};
-				AString filename = ADateTime().DateFormat("Detection-%Y-%M-%D-%h-%m-%s.jpg");
-				fprintf(stderr, "Saving detection image in '%s'\n", filename.str());
-				img.SaveJPEG(filename, tags);
+				avg[0] /= (double)len;
+				avg[1] /= (double)len;
+				avg[2] /= (double)len;
+
+				float *p2;
+				double avg2 = 0.0, sd2 = 0.0;
+				for (y = 0, p = ptr, p2 = ptr; y < h; y++) {
+					for (x = 0; x < w; x++, p += 3, p2++) {
+						p[0] -= avg[0];
+						p[1] -= avg[1];
+						p[2] -= avg[2];
+						p2[0] = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+						avg2 += p2[0];
+						sd2  += p2[0] * p2[0];
+					}
+				}
+
+				avg2 /= (double)len;
+				sd2   = sqrt(sd2 / (double)len - avg2 * avg2);
+
+				Interpolate(diffavg, avg2, coeff);
+				Interpolate(diffsd,  sd2, coeff);
+
+				double diff = diffavg + diffsd * factor, total = 0.0;
+				for (x = 0; x < len; x++) {
+					ptr[x] = MAX(ptr[x] - diff, 0.0);
+					total += ptr[x];
+				}
+
+				total /= 255.0;
+
+				printf("For %s, total = %0.1lf\n", img1->filename.str(), total);
+
+				if (total >= threshold) {
+					AImage img;
+					if (img.Create(rect.w, rect.h)) {
+						const AImage::PIXEL *opixel = img1->image.GetPixelData();
+						AImage::PIXEL *pixel = img.GetPixelData();
+
+						for (x = 0; x < len; x++, pixel++, opixel++) {
+							pixel->r = (uint8_t)LIMIT((double)opixel->r * ptr[x] / 255.0, 0.0, 255.0);
+							pixel->g = (uint8_t)LIMIT((double)opixel->g * ptr[x] / 255.0, 0.0, 255.0);
+							pixel->b = (uint8_t)LIMIT((double)opixel->b * ptr[x] / 255.0, 0.0, 255.0);
+						}
+
+						const TAG tags[] = {
+							{AImage::TAG_JPEG_QUALITY, 95},
+							{TAG_DONE},
+						};
+						AString filename = "Processed-" + img2->filename.FilePart();
+						fprintf(stderr, "Saving detection image in '%s'\n", filename.str());
+						img.SaveJPEG(filename, tags);
+					}
+				}
+				else remove(img1->filename);
+
+				delete img1;
+				imglist.Pop();
 			}
 		}
 	}
 
-	return detection ? 1 : 0;
-}
+	stats.Set("avg", AString("%0.16le").Arg(diffavg));
+	stats.Set("sd",  AString("%0.16le").Arg(diffsd));
 
+	return 0;
+}
