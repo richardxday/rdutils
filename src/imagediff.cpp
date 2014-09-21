@@ -48,14 +48,11 @@ IMAGE *CreateImage(const char *filename, const IMAGE *img0)
 			img->rect     = image.GetRect();
 			
 			if (img0 && (img->rect != img0->rect)) {
-				fprintf(stderr, "Image in file '%s' is %d x %d and not %d x %d\n", filename, img->rect.w, img->rect.h, img0->rect.w, img0->rect.h);
 				delete img;
 				img = NULL;
 			}
 		}
 		else {
-			fprintf(stderr, "Failed to load image from file '%s'\n", filename);
-			remove(filename);
 			delete img;
 			img = NULL;
 		}
@@ -94,7 +91,7 @@ int main(int argc, char *argv[])
 		double    diffsd  	= (double)stats.Get("sd", "0.0");
 		double    coeff     = (double)settings.Get("coeff", "1.0e-3");
 		double    factor    = (double)settings.Get("factor", "2.0");
-		double    threshold = (double)settings.Get("threshold", "4000.0");
+		double    threshold = (double)settings.Get("threshold", "3000.0");
 		uint64_t  delay     = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
 
 		hupsignal = false;
@@ -185,7 +182,7 @@ int main(int argc, char *argv[])
 							total += ptr[x];
 						}
 
-						total /= 255.0;
+						total = total * 1000.0 / ((double)w * (double)h);
 
 						log.printf("%s: Level = %0.1lf\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), total);
 
