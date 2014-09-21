@@ -69,12 +69,17 @@ int main(int argc, char *argv[])
 	AQuitHandler     quithandler;
 	ASettingsHandler stats("imagediff-stats", 5000);
 	ADataList imglist;
+	AStdFile  log;
 	IMAGE     *img;
 	int    	  i;
 
 	imglist.SetDestructor(&__DeleteImage);
 
 	signal(SIGHUP, &detecthup);
+
+	log.open(ADateTime().DateFormat("/var/log/imagediff/imagediff-%Y-%M-%D.log"), "a");
+
+	log.printf("%s: Starting detection...\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str());
 
 	while (!quithandler.HasQuit()) {
 		ASettingsHandler settings("imagediff");
@@ -92,8 +97,7 @@ int main(int argc, char *argv[])
 		double    threshold = (double)settings.Get("threshold", "4000.0");
 		uint64_t  delay     = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
 
-		printf("Loaded configuration...\n");
-
+		hupsignal = false;
 		while (!hupsignal && !quithandler.HasQuit()) {
 			ADateTime dt;
 
@@ -102,8 +106,6 @@ int main(int argc, char *argv[])
 			AString cmd;
 			cmd.printf("wget %s \"%s\" -O %s 2>/dev/null", wgetargs.str(), camurl.str(), tempfile.str());
 			if (system(cmd) == 0) {
-				printf("Fetched image at %s\n", dt.DateToStr().str());
-
 				if ((img = CreateImage(tempfile, (const IMAGE *)imglist[0])) != NULL) {
 					imglist.Add(img);
 			
@@ -185,7 +187,7 @@ int main(int argc, char *argv[])
 
 						total /= 255.0;
 
-						printf("Level = %0.1lf\n", total);
+						log.printf("%s: Level = %0.1lf\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), total);
 
 						if (total >= threshold) {
 							const TAG tags[] = {
@@ -213,7 +215,7 @@ int main(int argc, char *argv[])
 						
 							AString filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
 							CreateDirectory(filename.PathPart());
-							fprintf(stderr, "Saving detection image in '%s'\n", filename.str());
+							log.printf("%s: Saving detection image in '%s'\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), filename.str());
 							img1->image.SaveJPEG(filename, tags);
 						}
 					
@@ -222,7 +224,9 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
-			else fprintf(stderr, "Failed to fetch image using '%s'\n", cmd.str());
+			else log.printf("%s: Failed to fetch image using '%s'\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), cmd.str());
+
+			log.flush();
 
 			uint64_t dt1    = dt;
 			uint64_t dt2    = ADateTime();
@@ -230,10 +234,12 @@ int main(int argc, char *argv[])
 			Sleep((uint_t)msdiff);
 		}
 
-		hupsignal = false;
+		if (hupsignal) log.printf("%s: Re-loading configuration...\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str());
 
 		remove(tempfile);
 	}
+
+	log.close();
 
 	return 0;
 }
