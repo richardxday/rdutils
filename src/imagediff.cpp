@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
 							AString filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
 							CreateDirectory(filename.PathPart());
 							log.printf("%s: Saving detection image in '%s'\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), filename.str());
-							img1->image.SaveJPEG(filename, tags);
+							img2->image.SaveJPEG(filename, tags);
 						}
 					
 						delete img1;
