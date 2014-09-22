@@ -35,7 +35,7 @@ static void __DeleteImage(uptr_t item, void *context)
 	delete (IMAGE *)item;
 }
 
-IMAGE *CreateImage(const char *filename, const IMAGE *img0)
+IMAGE *CreateImage(AStdData& log, const char *filename, const IMAGE *img0)
 {
 	IMAGE *img = NULL;
 
@@ -53,6 +53,7 @@ IMAGE *CreateImage(const char *filename, const IMAGE *img0)
 			}
 		}
 		else {
+			log.printf("%s: Failed to load image '%s''\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), filename);
 			delete img;
 			img = NULL;
 		}
@@ -68,42 +69,54 @@ int main(int argc, char *argv[])
 	ADataList imglist;
 	AStdFile  log;
 	IMAGE     *img;
+	uint32_t  days = 0;
 	int    	  i;
+	bool	  startup = true;
 
 	imglist.SetDestructor(&__DeleteImage);
 
 	signal(SIGHUP, &detecthup);
 
-	log.open(ADateTime().DateFormat("/var/log/imagediff/imagediff-%Y-%M-%D.log"), "a");
-
-	log.printf("%s: Starting detection...\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str());
-
 	while (!quithandler.HasQuit()) {
 		ASettingsHandler settings("imagediff");
-		AString   wgetargs  = settings.Get("wgetargs");
-		AString   camurl    = settings.Get("cameraurl");
-		AString   tempfile  = settings.Get("tempfile", "/tmp/tempfs/temp.jpg");
-		AString   imagedir  = settings.Get("imagedir", "/media/cctv");
-		AString   imagefmt  = settings.Get("filename", "%Y-%M-%D/%h/Image-%Y-%M-%D-%h-%m-%s-%S");
-		AString   detimgdir = settings.Get("detimagedir", "");
-		AString   detimgfmt = settings.Get("detfilename", imagefmt);
-		double    diffavg 	= (double)stats.Get("avg", "0.0");
-		double    diffsd  	= (double)stats.Get("sd", "0.0");
-		double    coeff     = (double)settings.Get("coeff", "1.0e-3");
-		double    factor    = (double)settings.Get("factor", "2.0");
-		double    threshold = (double)settings.Get("threshold", "3000.0");
-		uint64_t  delay     = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
+		AString   wgetargs    = settings.Get("wgetargs");
+		AString   camurl      = settings.Get("cameraurl");
+		AString   tempfile    = settings.Get("tempfile", "/tmp/tempfs/temp.jpg");
+		AString   imagedir    = settings.Get("imagedir", "/media/cctv");
+		AString   imagefmt    = settings.Get("filename", "%Y-%M-%D/%h/Image-%Y-%M-%D-%h-%m-%s-%S");
+		AString   detimgdir   = settings.Get("detimagedir", "");
+		AString   detimgfmt   = settings.Get("detfilename", imagefmt);
+		AString   loglocation = settings.Get("loglocation", "/var/log/imagediff");
+		double    diffavg 	  = (double)stats.Get("avg", "0.0");
+		double    diffsd  	  = (double)stats.Get("sd", "0.0");
+		double    coeff       = (double)settings.Get("coeff", "1.0e-3");
+		double    factor      = (double)settings.Get("factor", "2.0");
+		double    threshold   = (double)settings.Get("threshold", "3000.0");
+		uint64_t  delay       = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
 
 		hupsignal = false;
 		while (!hupsignal && !quithandler.HasQuit()) {
 			ADateTime dt;
+			uint32_t days1;
+
+			if ((days1 = dt.GetDays()) != days) {
+				days = days1;
+
+				log.close();
+				log.open(loglocation.CatPath(dt.DateFormat("imagediff-%Y-%M-%D.log")), "a");
+				
+				if (startup) {
+					log.printf("%s: Starting detection...\n", dt.DateFormat("%Y-%M-%D %h:%m:%s").str());
+					startup = false;
+				}
+			}
 
 			stats.CheckWrite();
 		
 			AString cmd;
 			cmd.printf("wget %s \"%s\" -O %s 2>/dev/null", wgetargs.str(), camurl.str(), tempfile.str());
 			if (system(cmd) == 0) {
-				if ((img = CreateImage(tempfile, (const IMAGE *)imglist[0])) != NULL) {
+				if ((img = CreateImage(log, tempfile, (const IMAGE *)imglist[0])) != NULL) {
 					imglist.Add(img);
 			
 					if (imglist.Count() == 2) {
