@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 							if (detimgdir.Valid()) {
 								AImage img;
 								if (img.Create(rect.w, rect.h)) {
-									const AImage::PIXEL *opixel = img1->image.GetPixelData();
+									const AImage::PIXEL *opixel = img2->image.GetPixelData();
 									AImage::PIXEL *pixel = img.GetPixelData();
 
 									for (x = 0; x < len; x++, pixel++, opixel++) {
