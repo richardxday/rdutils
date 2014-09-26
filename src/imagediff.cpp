@@ -209,13 +209,14 @@ int main(int argc, char *argv[])
 							if (detimgdir.Valid()) {
 								AImage img;
 								if (img.Create(rect.w, rect.h)) {
-									const AImage::PIXEL *opixel = img2->image.GetPixelData();
+									const AImage::PIXEL *pixel1 = img1->image.GetPixelData();
+									const AImage::PIXEL *pixel2 = img2->image.GetPixelData();
 									AImage::PIXEL *pixel = img.GetPixelData();
 
-									for (x = 0; x < len; x++, pixel++, opixel++) {
-										pixel->r = (uint8_t)LIMIT((double)opixel->r * ptr[x] / 255.0, 0.0, 255.0);
-										pixel->g = (uint8_t)LIMIT((double)opixel->g * ptr[x] / 255.0, 0.0, 255.0);
-										pixel->b = (uint8_t)LIMIT((double)opixel->b * ptr[x] / 255.0, 0.0, 255.0);
+									for (x = 0; x < len; x++, pixel++, pixel1++, pixel2++) {
+										pixel->r = (uint8_t)LIMIT((double)MAX(pixel1->r, pixel2->r) * ptr[x] / 255.0, 0.0, 255.0);
+										pixel->g = (uint8_t)LIMIT((double)MAX(pixel1->g, pixel2->g) * ptr[x] / 255.0, 0.0, 255.0);
+										pixel->b = (uint8_t)LIMIT((double)MAX(pixel1->b, pixel2->b) * ptr[x] / 255.0, 0.0, 255.0);
 									}
 
 									AString filename = detimgdir.CatPath(dt.DateFormat(detimgfmt) + ".jpg");
