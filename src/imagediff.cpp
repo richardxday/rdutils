@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 	signal(SIGHUP, &detecthup);
 
 	while (!quithandler.HasQuit()) {
-		ASettingsHandler settings("imagediff");
+		ASettingsHandler settings("imagediff", ~0);
 		AString   wgetargs    = settings.Get("wgetargs");
 		AString   camurl      = settings.Get("cameraurl");
 		AString   tempfile    = settings.Get("tempfile", "/tmp/tempfs/temp.jpg");
@@ -93,9 +93,10 @@ int main(int argc, char *argv[])
 		double    factor      = (double)settings.Get("factor", "2.0");
 		double    threshold   = (double)settings.Get("threshold", "3000.0");
 		uint64_t  delay       = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
+		bool      reload      = (hupsignal || settings.HasFileChanged());
 
 		hupsignal = false;
-		while (!hupsignal && !quithandler.HasQuit()) {
+		while (!quithandler.HasQuit()) {
 			ADateTime dt;
 			uint32_t days1;
 
@@ -242,9 +243,13 @@ int main(int argc, char *argv[])
 			uint64_t dt2    = ADateTime();
 			uint64_t msdiff = SUBZ(dt1 + delay, dt2);
 			Sleep((uint_t)msdiff);
-		}
 
-		if (hupsignal) log.printf("%s: Re-loading configuration...\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str());
+			if (hupsignal || settings.HasFileChanged()) {
+				log.printf("%s: Reloading configuration\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str());
+				hupsignal = false;
+				break;
+			}
+		}
 
 		remove(tempfile);
 	}

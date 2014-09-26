@@ -141,7 +141,7 @@ static void GrepFile(const char *filename, FILE *fp, GREP_CONTEXT *p)
 	}
 }
 
-static bool __Grep(const FILE_FIND *File, void *Context)
+static bool __Grep(const FILE_INFO *File, void *Context)
 {
 	GREP_CONTEXT *p = (GREP_CONTEXT *)Context;
 	FILE *fp;
@@ -233,7 +233,7 @@ static void GrepExpandFile(const char *filename, FILE *fp, GREP_CONTEXT *p)
 	}
 }
 
-static bool __GrepExpand(const FILE_FIND *File, void *Context)
+static bool __GrepExpand(const FILE_INFO *File, void *Context)
 {
 	GREP_CONTEXT *p = (GREP_CONTEXT *)Context;
 	FILE *fp;
