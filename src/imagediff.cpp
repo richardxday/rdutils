@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 		AString   imagedir    = settings.Get("imagedir", "/media/cctv");
 		AString   imagefmt    = settings.Get("filename", "%Y-%M-%D/%h/Image-%Y-%M-%D-%h-%m-%s-%S");
 		AString   detimgdir   = settings.Get("detimagedir", "");
-		AString   detimgfmt   = settings.Get("detfilename", imagefmt);
+		AString   detimgfmt   = settings.Get("detfilename", "%Y-%M-%D/%h/detection/Image-%Y-%M-%D-%h-%m-%s-%S");
 		AString   loglocation = settings.Get("loglocation", "/var/log/imagediff");
 		double    diffavg 	  = (double)stats.Get("avg", "0.0");
 		double    diffsd  	  = (double)stats.Get("sd", "0.0");
