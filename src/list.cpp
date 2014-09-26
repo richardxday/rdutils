@@ -115,7 +115,7 @@ static uint_t GetSubParts(const AString& str, const AString& tokens, AString *st
 	return n;
 }
 
-static bool __List(const FILE_FIND *file, void *Context)
+static bool __List(const FILE_INFO *file, void *Context)
 {
 	LIST_CONTEXT *p = (LIST_CONTEXT *)Context;
 	bool isdir = ((file->Attrib & FILE_FLAG_IS_DIR) != 0);
