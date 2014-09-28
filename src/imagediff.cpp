@@ -79,26 +79,75 @@ int main(int argc, char *argv[])
 
 	while (!quithandler.HasQuit()) {
 		ASettingsHandler settings("imagediff", ~0);
+		std::vector<float> matrix;
 		AString   wgetargs    = settings.Get("wgetargs");
 		AString   camurl      = settings.Get("cameraurl");
-		AString   tempfile    = settings.Get("tempfile", "/tmp/tempfs/temp.jpg");
+		AString   tempfile    = settings.Get("tempfile", AString("/home/%s/temp.jpg").Arg(getenv("LOGNAME")));
 		AString   imagedir    = settings.Get("imagedir", "/media/cctv");
 		AString   imagefmt    = settings.Get("filename", "%Y-%M-%D/%h/Image-%Y-%M-%D-%h-%m-%s-%S");
 		AString   detimgdir   = settings.Get("detimagedir", "");
 		AString   detimgfmt   = settings.Get("detfilename", "%Y-%M-%D/%h/detection/Image-%Y-%M-%D-%h-%m-%s-%S");
 		AString   loglocation = settings.Get("loglocation", "/var/log/imagediff");
+		AString   _matrix     = settings.Get("matrix", "");
 		double    diffavg 	  = (double)stats.Get("avg", "0.0");
 		double    diffsd  	  = (double)stats.Get("sd", "0.0");
 		double    coeff       = (double)settings.Get("coeff", "1.0e-3");
-		double    factor      = (double)settings.Get("factor", "2.0");
-		double    threshold   = (double)settings.Get("threshold", "3000.0");
+		double    avgfactor   = (double)settings.Get("avgfactor",  "1.0");
+		double    sdfactor    = (double)settings.Get("sdfactor",   "2.0");
+		double    redscale    = (double)settings.Get("rscale",   "1.0");
+		double    grnscale    = (double)settings.Get("gscale", "1.0");
+		double    bluscale    = (double)settings.Get("bscale",  "1.0");
+		double    threshold   = (double)settings.Get("threshold",  "3000.0");
+		float     matmul      = 1.f;
+		uint_t    matwid = 0, mathgt = 0;
 		uint64_t  delay       = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
-		bool      reload      = (hupsignal || settings.HasFileChanged());
+
+		if (_matrix.Valid()) {
+			uint_t row, nrows = _matrix.CountLines(";");
+			uint_t col, ncols = 1;
+			int    p;
+
+			if ((p = _matrix.Pos("*")) >= 0) {
+				AString mul = _matrix.Mid(p + 1);
+				
+				_matrix = _matrix.Left(p);
+
+				if ((p = mul.Pos("/")) >= 0) {
+					matmul = (float)mul.Left(p) / (float)mul.Mid(p + 1);
+				}
+				else matmul = (float)mul;
+			}
+			else if ((p = _matrix.Pos("/")) >= 0) {
+				AString mul = _matrix.Mid(p + 1);
+				
+				_matrix = _matrix.Left(p);
+
+				matmul = 1.f / (float)mul;
+			}
+
+			for (row = 0; row < nrows; row++) {
+				uint_t n = _matrix.Line(row, ";").CountLines(",");
+				ncols = MAX(ncols, n);
+			}
+
+			nrows |= 1;
+			ncols |= 1;
+
+			matrix.resize(nrows * ncols);
+			for (row = 0; row < nrows; row++) {
+				AString line = _matrix.Line(row,";");
+				
+				for (col = 0; col < ncols; col++) matrix[col + row * ncols] = (float)line.Line(col, ",");
+			}
+
+			matwid = ncols;
+			mathgt = nrows;
+		}
 
 		hupsignal = false;
 		while (!quithandler.HasQuit()) {
 			ADateTime dt;
-			uint32_t days1;
+			uint32_t  days1;
 
 			if ((days1 = dt.GetDays()) != days) {
 				days = days1;
@@ -142,9 +191,9 @@ int main(int argc, char *argv[])
 							memset(yavg, 0, sizeof(yavg));
 
 							for (x = 0; x < w; x++, p += 3, pix1++, pix2++) {
-								p[0] 	 = (float)pix1->r - (float)pix2->r;
-								p[1] 	 = (float)pix1->g - (float)pix2->g;
-								p[2] 	 = (float)pix1->b - (float)pix2->b;
+								p[0] 	 = ((float)pix1->r - (float)pix2->r) * redscale;
+								p[1] 	 = ((float)pix1->g - (float)pix2->g) * grnscale;
+								p[2] 	 = ((float)pix1->b - (float)pix2->b) * bluscale;
 
 								yavg[0] += p[0];
 								yavg[1] += p[1];
@@ -169,15 +218,39 @@ int main(int argc, char *argv[])
 						avg[2] /= (double)len;
 
 						float *p2;
-						double avg2 = 0.0, sd2 = 0.0;
 						for (y = 0, p = ptr, p2 = ptr; y < h; y++) {
 							for (x = 0; x < w; x++, p += 3, p2++) {
 								p[0] -= avg[0];
 								p[1] -= avg[1];
 								p[2] -= avg[2];
 								p2[0] = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
-								avg2 += p2[0];
-								sd2  += p2[0] * p2[0];
+							}
+						}
+
+						double avg2 = 0.0, sd2 = 0.0;
+						uint_t mx, my, cx = (matwid - 1) >> 1, cy = (mathgt - 1) >> 1;
+						for (x = 0; x < w; x++) {
+							for (y = 0; y < h; y++) {
+								float val = 0.f;
+
+								if (matwid && mathgt) {
+									for (my = 0; my < mathgt; my++) {
+										if (((y + my) >= cy) && ((y + my) < (h + cy))) {
+											for (mx = 0; mx < matwid; mx++) {
+												if (((x + mx) >= cx) && ((x + mx) < (h + cx))) {
+													val += matrix[mx + my * matwid] * ptr[(x + mx - cx) + (y + my - cy) * w];
+												}
+											}
+										}
+									}
+
+									val *= matmul;
+								}
+								else val = ptr[x + y * w];
+
+								ptr[w * h + x + y * w] = (float)val;
+								avg2 += val;
+								sd2  += val * val;
 							}
 						}
 
@@ -185,14 +258,14 @@ int main(int argc, char *argv[])
 						sd2   = sqrt(sd2 / (double)len - avg2 * avg2);
 
 						Interpolate(diffavg, avg2, coeff);
-						Interpolate(diffsd,  sd2, coeff);
+						Interpolate(diffsd,  sd2,  coeff);
 
 						stats.Set("avg", AString("%0.16le").Arg(diffavg));
 						stats.Set("sd",  AString("%0.16le").Arg(diffsd));
 
-						double diff = diffavg + diffsd * factor, total = 0.0;
+						double diff = avgfactor * diffavg + sdfactor * diffsd, total = 0.0;
 						for (x = 0; x < len; x++) {
-							ptr[x] = MAX(ptr[x] - diff, 0.0);
+							ptr[x] = MAX(ptr[w * h + x] - diff, 0.0);
 							total += ptr[x];
 						}
 
