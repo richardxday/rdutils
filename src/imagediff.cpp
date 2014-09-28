@@ -92,12 +92,12 @@ int main(int argc, char *argv[])
 		double    diffavg 	  = (double)stats.Get("avg", "0.0");
 		double    diffsd  	  = (double)stats.Get("sd", "0.0");
 		double    coeff       = (double)settings.Get("coeff", "1.0e-3");
-		double    avgfactor   = (double)settings.Get("avgfactor",  "1.0");
-		double    sdfactor    = (double)settings.Get("sdfactor",   "2.0");
-		double    redscale    = (double)settings.Get("rscale",   "1.0");
-		double    grnscale    = (double)settings.Get("gscale", "1.0");
-		double    bluscale    = (double)settings.Get("bscale",  "1.0");
-		double    threshold   = (double)settings.Get("threshold",  "3000.0");
+		double    avgfactor   = (double)settings.Get("avgfactor", "1.0");
+		double    sdfactor    = (double)settings.Get("sdfactor",  "2.0");
+		double    redscale    = (double)settings.Get("rscale",    "1.0");
+		double    grnscale    = (double)settings.Get("gscale",    "1.0");
+		double    bluscale    = (double)settings.Get("bscale",    "1.0");
+		double    threshold   = (double)settings.Get("threshold", "3000.0");
 		float     matmul      = 1.f;
 		uint_t    matwid = 0, mathgt = 0;
 		uint64_t  delay       = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
@@ -142,6 +142,15 @@ int main(int argc, char *argv[])
 
 			matwid = ncols;
 			mathgt = nrows;
+
+#if 0
+			printf("Matrix is %u x %u:\n", matwid, mathgt);
+			for (row = 0; row < nrows; row++) {
+				for (col = 0; col < ncols; col++) printf("%8.3f", matrix[col + row * ncols]);
+				printf("\n");
+			}
+			printf("Multiplier %0.6f\n", matmul);
+#endif
 		}
 
 		hupsignal = false;
