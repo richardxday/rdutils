@@ -429,8 +429,7 @@ int main(int argc, char *argv[])
 			list[i]->Process(dt, update);
 		}
 
-
-		if (update || ((GetTickCount() - statswritetime) >= 5000)) {
+		if (update || ((GetTickCount() - statswritetime) >= 2000)) {
 			stats.Write();
 			statswritetime = GetTickCount();
 		}
