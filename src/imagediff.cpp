@@ -30,7 +30,8 @@ public:
 																					name(AString("imagediff%u").Arg(index)),
 																					settings(name, ~0),
 																					stats(name + "-stats", 5000),
-																					sample(0) {
+																					sample(0),
+																					statswritetime(GetTickCount()) {
 		imglist.SetDestructor(&__DeleteImage);
 
 		diffavg = (double)stats.Get("avg", "0.0");
@@ -122,6 +123,7 @@ protected:
 	float     			  	matmul;
 	uint_t    			  	matwid, mathgt;
 	uint_t				    subsample, sample;
+	uint32_t				statswritetime;
 };
 
 void ImageDiffer::Configure()
@@ -203,8 +205,6 @@ void ImageDiffer::Configure()
 
 void ImageDiffer::Process(const ADateTime&dt, bool update)
 {
-	stats.CheckWrite();
-
 	if (update || settings.HasFileChanged()) {
 		log.printf("%s[%u]: Re-configuring\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), index);
 		Configure();
@@ -366,6 +366,11 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 		log.flush();
 
 		sample = 0;
+	}
+
+	if (update || ((GetTickCount() - statswritetime) >= 5000)) {
+		stats.Write();
+		statswritetime = GetTickCount();
 	}
 }
 
