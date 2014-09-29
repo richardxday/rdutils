@@ -24,18 +24,18 @@ static void detecthup(int sig)
 
 class ImageDiffer {
 public:
-	ImageDiffer(const ASettingsHandler& _settings, AStdFile& _log, uint_t _index) : global(_settings),
-																					log(_log),
-																					index(_index),
-																					name(AString("imagediff%u").Arg(index)),
-																					settings(name, ~0),
-																					stats(name + "-stats", 5000),
-																					sample(0),
-																					statswritetime(GetTickCount()) {
+	ImageDiffer(const ASettingsHandler& _settings, ASettingsHandler& _stats, AStdFile& _log, uint_t _index) :
+		global(_settings),
+		stats(_stats),
+		log(_log),
+		index(_index),
+		name(AString("imagediff%u").Arg(index)),
+		settings(name, ~0),
+		sample(0) {
 		imglist.SetDestructor(&__DeleteImage);
 
-		diffavg = (double)stats.Get("avg", "0.0");
-		diffsd  = (double)stats.Get("sd", "0.0");
+		diffavg = (double)stats.Get(AString("avg%u").Arg(index), "0.0");
+		diffsd  = (double)stats.Get(AString("sd%u").Arg(index),  "0.0");
 
 		Configure();
 
@@ -97,10 +97,10 @@ protected:
 
 protected:
 	const ASettingsHandler& global;
+	ASettingsHandler&		stats;
 	AStdFile&				log;
 	uint_t					index;
 	AString					name;
-	ASettingsHandler 		stats;
 	ASettingsHandler 		settings;
 	ADataList				imglist;
 	AString   			  	wgetargs;
@@ -133,9 +133,9 @@ void ImageDiffer::Configure()
 	AString nstr = AString("%u").Arg(index);
 	wgetargs  = settings.Get("wgetargs", global.Get("wgetargs"));
 	camurl    = settings.Get("cameraurl", global.Get("cameraurl"));
-	tempfile  = settings.Get("tempfile", AString("/home/%s/temp%n.jpg").Arg(getenv("LOGNAME"))).SearchAndReplace("%n", nstr);
+	tempfile  = settings.Get("tempfile", global.Get("tempfile", AString("/home/%s/temp%n.jpg").Arg(getenv("LOGNAME")))).SearchAndReplace("%n", nstr);
 	imagedir  = settings.Get("imagedir", global.Get("imagedir", "/media/cctv")).SearchAndReplace("%n", nstr);
-	imagefmt  = settings.Get("filename", global.Get("imagedir", "%Y-%M-%D/%h/%n/Image-%Y-%M-%D-%h-%m-%s-%S")).SearchAndReplace("%n", nstr);
+	imagefmt  = settings.Get("filename", global.Get("filename", "%Y-%M-%D/%h/%n/Image-%Y-%M-%D-%h-%m-%s-%S")).SearchAndReplace("%n", nstr);
 	detimgdir = settings.Get("detimagedir", global.Get("detimagedir")).SearchAndReplace("%n", nstr);
 	detimgfmt = settings.Get("detfilename", global.Get("detfilename", "%Y-%M-%D/%h/%n/detection/Image-%Y-%M-%D-%h-%m-%s-%S")).SearchAndReplace("%n", nstr);
 	coeff  	  = (double)settings.Get("coeff", global.Get("coeff", "1.0e-3"));
@@ -210,8 +210,9 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 		Configure();
 	}
 
-	if ((++sample) >= subsample) {
+	if (camurl.Valid() && ((++sample) >= subsample)) {
 		AString cmd;
+	
 		cmd.printf("wget %s \"%s\" -O %s 2>/dev/null", wgetargs.str(), camurl.str(), tempfile.str());
 		if (system(cmd) == 0) {
 			IMAGE *img;
@@ -310,8 +311,8 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 					Interpolate(diffavg, avg2, coeff);
 					Interpolate(diffsd,  sd2,  coeff);
 
-					stats.Set("avg", AString("%0.16le").Arg(diffavg));
-					stats.Set("sd",  AString("%0.16le").Arg(diffsd));
+					stats.Set(AString("avg%u").Arg(index), AString("%0.16le").Arg(diffavg));
+					stats.Set(AString("sd%u").Arg(index),  AString("%0.16le").Arg(diffsd));
 
 					double diff = avgfactor * diffavg + sdfactor * diffsd, total = 0.0;
 					for (x = 0; x < len; x++) {
@@ -323,7 +324,7 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 
 					//log.printf("%s[%u]: Level = %0.1lf\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), index, total);
 
-					stats.Set("level", AString("%0.4lf").Arg(total));
+					stats.Set(AString("level%u").Arg(index), AString("%0.4lf").Arg(total));
 
 					if (total >= threshold) {
 						const TAG tags[] = {
@@ -367,11 +368,6 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 
 		sample = 0;
 	}
-
-	if (update || ((GetTickCount() - statswritetime) >= 5000)) {
-		stats.Write();
-		statswritetime = GetTickCount();
-	}
 }
 
 int main(int argc, char *argv[])
@@ -379,10 +375,12 @@ int main(int argc, char *argv[])
 	AQuitHandler     quithandler;
 	ADataList        differs;
 	ASettingsHandler settings("imagediff", ~0);
+	ASettingsHandler stats("imagediff-stats", 5000);
 	AString  		 loglocation;
 	AStdFile  		 log;
 	uint64_t 		 delay;
 	uint32_t  		 days    = 0;
+	uint32_t		 statswritetime = GetTickCount();
 	bool			 update  = true;
 	bool			 startup = true;
 
@@ -421,7 +419,7 @@ int main(int argc, char *argv[])
 				delete (ImageDiffer *)differs.EndPop();
 			}
 			while (differs.Count() < n) {
-				differs.Add(new ImageDiffer(settings, log, differs.Count() + 1));
+				differs.Add(new ImageDiffer(settings, stats, log, differs.Count() + 1));
 			}
 		}
 
@@ -429,6 +427,12 @@ int main(int argc, char *argv[])
 		ImageDiffer **list = (ImageDiffer **)differs.List();
 		for (i = 0; i < n; i++) {
 			list[i]->Process(dt, update);
+		}
+
+
+		if (update || ((GetTickCount() - statswritetime) >= 5000)) {
+			stats.Write();
+			statswritetime = GetTickCount();
 		}
 
 		uint64_t dt1    = dt;
