@@ -48,6 +48,6 @@ imagediff_CPPFLAGS =							\
 	$(RDLIB_CFLAGS)								\
 	$(RDUTILS_CFLAGS)
 
-imagediff_SOURCES = imagediff.cpp
+imagediff_SOURCES = imagediff.cpp ImageDiffer.cpp
 
 DISTCLEANFILES =
