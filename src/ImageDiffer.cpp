@@ -143,6 +143,8 @@ void ImageDiffer::Configure()
 
 void ImageDiffer::Process(const ADateTime&dt, bool update)
 {
+	bool verbose = ((int)global.Get("verbose", "0") != 0);
+
 	if (update || settings.HasFileChanged()) {
 		log.printf("%s[%u]: Re-configuring\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), index);
 		Configure();
@@ -260,7 +262,7 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 
 					total = total * 1000.0 / ((double)w * (double)h);
 
-					//log.printf("%s[%u]: Level = %0.1lf\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), index, total);
+					if (verbose) log.printf("%s[%u]: Level = %0.1lf\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), index, total);
 
 					stats.Set(AString("level%u").Arg(index), AString("%0.4lf").Arg(total));
 
