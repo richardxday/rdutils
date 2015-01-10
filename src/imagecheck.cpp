@@ -24,8 +24,9 @@ int main(int argc, char *argv[])
 				if (exifinfo && (exifinfo->CameraMake[0] || exifinfo->CameraModel[0])) {
 					AString cameramake(exifinfo->CameraMake, sizeof(exifinfo->CameraMake));
 					AString cameramodel(exifinfo->CameraModel, sizeof(exifinfo->CameraModel));
+					AString datetime(exifinfo->DateTime, sizeof(exifinfo->DateTime));
 
-					printf("%s: '%s' / '%s'\n", argv[i], cameramake.str(), cameramodel.str());
+					printf("%s: '%s' / '%s' : %s\n", argv[i], cameramake.str(), cameramodel.str(), datetime.str());
 				}
 			}			
 			
