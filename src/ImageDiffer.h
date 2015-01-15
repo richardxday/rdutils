@@ -69,6 +69,7 @@ protected:
 	uint_t    			  	matwid, mathgt;
 	uint_t				    subsample, sample;
 	uint32_t				statswritetime;
+	uint_t				    verbose;
 };
 
 #endif

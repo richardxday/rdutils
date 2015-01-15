@@ -16,7 +16,8 @@ ImageDiffer::ImageDiffer(const ASettingsHandler& _settings, ASettingsHandler& _s
 	index(_index),
 	name(AString("imagediff%u").Arg(index)),
 	settings(name, ~0),
-	sample(0)
+	sample(0),
+	verbose(0)
 {
 	imglist.SetDestructor(&__DeleteImage);
 	
@@ -47,9 +48,10 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(AStdData& log, const char *filename
 			img->filename = filename;
 			img->rect     = image.GetRect();
 			
-			if (img0 && (img->rect != img0->rect)) {
-				delete img;
-				img = NULL;
+			if (img0 && (img0->rect != img->rect)) {
+				log.printf("%s: Images are different sizes (%dx%d -> %dx%d), deleting earlier one\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), img0->rect.w, img0->rect.h, img->rect.w, img->rect.h);
+				delete img0;
+				imglist.Pop();
 			}
 		}
 		else {
@@ -84,6 +86,8 @@ void ImageDiffer::Configure()
 	bluscale  = (double)settings.Get("bscale", 	  global.Get("bscale", "1.0"));
 	threshold = (double)settings.Get("threshold", global.Get("threshold", "3000.0"));
 	subsample = (uint_t)settings.Get("subsample", global.Get("subsample", "1"));
+	verbose   = (uint_t)settings.Get("verbose",   global.Get("verbose", "0"));
+
 	matmul 	  = 1.f;
 	matwid 	  = mathgt = 0;
 
@@ -143,8 +147,6 @@ void ImageDiffer::Configure()
 
 void ImageDiffer::Process(const ADateTime&dt, bool update)
 {
-	bool verbose = ((int)global.Get("verbose", "0") != 0);
-
 	if (update || settings.HasFileChanged()) {
 		log.printf("%s[%u]: Re-configuring\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), index);
 		Configure();
