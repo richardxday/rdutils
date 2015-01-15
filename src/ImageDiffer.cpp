@@ -49,13 +49,19 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(AStdData& log, const char *filename
 			img->rect     = image.GetRect();
 			
 			if (img0 && (img0->rect != img->rect)) {
-				log.printf("%s: Images are different sizes (%dx%d -> %dx%d), deleting earlier one\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), img0->rect.w, img0->rect.h, img->rect.w, img->rect.h);
+				log.printf("%s[%u]: Images are different sizes (%dx%d -> %dx%d), deleting earlier one\n",
+						   ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(),
+						   index,
+						   img0->rect.w, img0->rect.h, img->rect.w, img->rect.h);
 				delete img0;
 				imglist.Pop();
 			}
 		}
 		else {
-			log.printf("%s: Failed to load image '%s''\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), filename);
+			log.printf("%s[%u]: Failed to load image '%s''\n",
+					   ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(),
+					   index,
+					   filename);
 			delete img;
 			img = NULL;
 		}
