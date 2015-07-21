@@ -177,7 +177,7 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 					std::vector<float> data;
 					float *ptr, *p;
 					double avg[3];
-					uint_t x, y, w = rect.w, h = rect.h, w3 = w * 3, len = w * h, len3 = w3 * h, c;
+					uint_t x, y, w = rect.w, h = rect.h, w3 = w * 3, len = w * h, len3 = w3 * h;
 				
 					data.resize(len3);
 					ptr = &data[0];
@@ -277,7 +277,7 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 					if (total >= threshold) {
 						const TAG tags[] = {
 							{AImage::TAG_JPEG_QUALITY, 95},
-							{TAG_DONE},
+							{TAG_DONE, 0},
 						};
 
 						if (detimgdir.Valid()) {
@@ -306,12 +306,16 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 
 						if (detcmd.Valid()) {
 							AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4lf").Arg(total));
-							system(cmd);
+							if (system(cmd) != 0) {
+								debug("Detection command '%s' failed\n", cmd.str());
+							}
 						}
 					}
 					else if (nodetcmd.Valid()) {
 						AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4lf").Arg(total));
-						system(cmd);
+						if (system(cmd) != 0) {
+							debug("No-detection command '%s' failed\n", cmd.str());
+						}
 					}
 
 					delete img1;

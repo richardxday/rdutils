@@ -18,7 +18,7 @@ static void detecthup(int sig)
 	hupsignal |= (sig == SIGHUP);
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
 	AQuitHandler     quithandler;
 	ADataList        differs;
