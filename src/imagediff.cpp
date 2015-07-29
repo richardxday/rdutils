@@ -26,7 +26,7 @@ int main(void)
 	ASettingsHandler stats("imagediff-stats", 5000);
 	AString  		 loglocation;
 	AStdFile  		 log;
-	uint64_t 		 delay;
+	uint64_t 		 delay   = 0;
 	uint32_t  		 days    = 0;
 	uint32_t		 statswritetime = GetTickCount();
 	bool			 update  = true;
