@@ -4,7 +4,8 @@ bin_PROGRAMS =									\
 	imagediff									\
 	list										\
 	pingchecker									\
-	uri2uri
+	uri2uri										\
+	cctvstream
 
 agrep_LDADD =									\
 	$(RDLIB_LIBS)
@@ -59,5 +60,14 @@ imagecheck_CPPFLAGS =							\
 	$(RDUTILS_CFLAGS)
 
 imagecheck_SOURCES = imagecheck.cpp
+
+cctvstream_LDADD =								\
+	$(RDLIB_LIBS)
+
+cctvstream_CPPFLAGS =							\
+	$(RDLIB_CFLAGS)								\
+	$(RDUTILS_CFLAGS)
+
+cctvstream_SOURCES = cctvstream.cpp CameraStream.cpp
 
 DISTCLEANFILES =
