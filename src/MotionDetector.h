@@ -25,7 +25,6 @@ protected:
 	ASettingsHandler&		stats;
 	AStdFile&				log;
 	uint_t					index;
-	AString					name;
 	std::vector<AImage>		images;
 	uint_t					imgindex;
 	AString   			  	imagedir;

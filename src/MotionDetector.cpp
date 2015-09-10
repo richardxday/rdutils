@@ -13,7 +13,6 @@ MotionDetector::MotionDetector(ASocketServer& _server,
 												stats(_stats),
 												log(_log),
 												index(_index),
-												name(AString("imagediff%u").Arg(index)),
 												images(4),
 												imgindex(0),
 												verbose(0)

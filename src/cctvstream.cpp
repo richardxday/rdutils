@@ -6,6 +6,7 @@
 
 #include <rdlib/QuitHandler.h>
 #include <rdlib/SettingsHandler.h>
+#include <rdlib/Recurse.h>
 
 #include "MotionDetector.h"
 
@@ -18,10 +19,11 @@ static void detecthup(int sig)
 
 int main(void)
 {
+	static const AString appname = "cctvstream";
 	AQuitHandler     quithandler;
 	ASocketServer 	 server;
-	ASettingsHandler settings("cctvstream", ~0);
-	ASettingsHandler stats("cctvstream-stats", 5000);
+	ASettingsHandler settings(appname, ~0);
+	ASettingsHandler stats(appname + "-stats", 5000);
 	AString  		 loglocation;
 	AStdFile  		 log;
 	uint32_t  		 days    = 0;
@@ -38,7 +40,8 @@ int main(void)
 
 		if (update) {
 			settings.Read();
-			loglocation = settings.Get("loglocation", "/var/log/imagediff");
+			loglocation = settings.Get("loglocation", "/var/log/" + appname);
+			CreateDirectory(loglocation);
 			days        = 0;
 			detector.Configure();
 		}
@@ -47,7 +50,7 @@ int main(void)
 			days = days1;
 
 			log.close();
-			log.open(loglocation.CatPath(dt.DateFormat("imagediff-%Y-%M-%D.log")), "a");
+			log.open(loglocation.CatPath(dt.DateFormat(appname + "-%Y-%M-%D.log")), "a");
 				
 			if (startup) {
 				log.printf("%s[all]: Starting detection...\n", dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str());
