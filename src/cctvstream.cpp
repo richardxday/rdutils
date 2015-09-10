@@ -20,8 +20,8 @@ int main(void)
 {
 	AQuitHandler     quithandler;
 	ASocketServer 	 server;
-	ASettingsHandler settings("imagediff", ~0);
-	ASettingsHandler stats("imagediff-stats", 5000);
+	ASettingsHandler settings("cctvstream", ~0);
+	ASettingsHandler stats("cctvstream-stats", 5000);
 	AString  		 loglocation;
 	AStdFile  		 log;
 	uint32_t  		 days    = 0;
