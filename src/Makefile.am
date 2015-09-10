@@ -68,6 +68,6 @@ cctvstream_CPPFLAGS =							\
 	$(RDLIB_CFLAGS)								\
 	$(RDUTILS_CFLAGS)
 
-cctvstream_SOURCES = cctvstream.cpp CameraStream.cpp
+cctvstream_SOURCES = cctvstream.cpp CameraStream.cpp MotionDetector.cpp
 
 DISTCLEANFILES =

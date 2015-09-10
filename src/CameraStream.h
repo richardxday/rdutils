@@ -3,6 +3,7 @@
 
 #include <rdlib/HTTPRequest.h>
 #include <rdlib/BMPImage.h>
+#include <rdlib/DateTime.h>
 
 class CameraStream : public AHTTPRequest {
 public:
@@ -11,9 +12,19 @@ public:
 
 	void SetUsernameAndPassword(const AString& _username, const AString& _password) {username = _username; password = _password;}
 	
-	virtual bool Open(const AString& _host, uint_t _port = 99);
+	virtual bool Open(const AString& _host);
 
 	bool StreamComplete() const {return (stage >= Stage_Done);}
+
+	class ImageHandler {
+	public:
+		ImageHandler() {}
+		virtual ~ImageHandler() {}
+		
+		virtual void ProcessImage(const ADateTime& dt, const AImage& image) = 0;
+	};
+
+	virtual void SetImageHandler(ImageHandler *handler, bool del = false) {imagehandler = handler; deleteimagehandler = del;}
 	
 protected:
 	virtual bool Open();
@@ -39,15 +50,17 @@ protected:
 	};
 	
 protected:
-	AString camerahost;
-	uint_t  cameraport;
-	AString username;
-	AString password;
-	AString boundary;
-	uint_t  stage;
-	uint_t  sstage;
-	uint_t  contentlength;
+	AString 			 camerahost;
+	AString 			 username;
+	AString 			 password;
+	AString 			 boundary;
+	uint_t  			 stage;
+	uint_t  			 sstage;
+	uint_t  			 contentlength;
+	ADateTime			 contentdt;
 	std::vector<uint8_t> content;
+	ImageHandler 		 *imagehandler;
+	bool			     deleteimagehandler;
 };
 
 #endif

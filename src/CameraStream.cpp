@@ -4,9 +4,9 @@
 #include "CameraStream.h"
 
 CameraStream::CameraStream(ASocketServer *_server) : AHTTPRequest(_server),
-													 username("admin"),
-													 password("arsebark"),
-													 stage(Stage_Idle)
+													 stage(Stage_Idle),
+													 imagehandler(NULL),
+													 deleteimagehandler(false)
 {
 }
 
@@ -14,12 +14,13 @@ CameraStream::~CameraStream()
 {
 	stage = Stage_Done;
 	Close();
+
+	if (imagehandler && deleteimagehandler) delete imagehandler;
 }
 
-bool CameraStream::Open(const AString& _host, uint_t _port)
+bool CameraStream::Open(const AString& _host)
 {
 	camerahost = _host;
-	cameraport = _port;
 	stage      = Stage_CameraControl;
 	
 	return Open();
@@ -32,11 +33,11 @@ bool CameraStream::Open()
 	
 	switch (stage) {
 		case Stage_CameraControl:
-			_url.printf("%s:%u/camera_control.cgi?loginuse=%s&loginpas=%s&param=0&value=0", camerahost.str(), cameraport, username.str(), password.str());
+			_url.printf("%s/camera_control.cgi?loginuse=%s&loginpas=%s&param=0&value=0", camerahost.str(), username.str(), password.str());
 			break;
 			
 		case Stage_Streaming:
-			_url.printf("%s:%u/videostream.cgi?user=%s&pwd=%s", camerahost.str(), cameraport, username.str(), password.str());
+			_url.printf("%s/videostream.cgi?user=%s&pwd=%s", camerahost.str(), username.str(), password.str());
 			break;
 
 		default:
@@ -57,6 +58,9 @@ void CameraStream::Cleanup()
 {
 	AHTTPRequest::Cleanup();
 
+	content.resize(0);
+	contentlength = 0;
+	
 	if ((++stage) < Stage_Done) Open();
 }
 
@@ -88,7 +92,7 @@ void CameraStream::ProcessData()
 
 				if (GetHeader(header, maxlen)) {
 					//debug("Received '%s'\n", header.str());
-
+					
 					ProcessHeader(header);
 				}
 				else if (data.size() >= maxlen) {
@@ -124,7 +128,10 @@ void CameraStream::ProcessHeader(const AString& header)
 			break;
 
 		case StreamStage_LookingForBoundary:
-			if (header == boundary) sstage++;
+			if (header == boundary) {
+				contentdt.TimeStamp();
+				sstage++;
+			}
 			break;
 
 
@@ -143,7 +150,6 @@ void CameraStream::ProcessContent()
 	AStdMemFile fp;
 
 	//debug("Got %u bytes of content\n", (uint_t)content.size());
-
 	if (fp.open("w")) {
 		AImage image;
 
@@ -159,5 +165,6 @@ void CameraStream::ProcessContent()
 
 void CameraStream::ProcessImage(const AImage& image)
 {
-	debug("Got image %d x %d\n", image.GetRect().w, image.GetRect().h);
+	//debug("Got image %d x %d\n", image.GetRect().w, image.GetRect().h);
+	if (imagehandler) imagehandler->ProcessImage(contentdt, image);
 }
