@@ -38,6 +38,8 @@ int main(void)
 		ADateTime dt;
 		uint32_t  days1;
 
+		if (detector.GetStream().IsStreaming()) Sleep(200);
+		
 		if (update) {
 			settings.Read();
 			loglocation = settings.Get("loglocation", "/var/log/" + appname);
@@ -58,7 +60,7 @@ int main(void)
 			}
 		}
 
-		server.Process(200);
+		server.Process(1000);
 		
 		if (update || ((GetTickCount() - statswritetime) >= 2000)) {
 			stats.Write();

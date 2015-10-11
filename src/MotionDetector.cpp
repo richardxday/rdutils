@@ -50,7 +50,7 @@ void MotionDetector::Configure()
 
 	AString camera = GetSetting("camera", "");
 	log.printf("%s[%u]: Connecting to %s...\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s.%S").str(), index, camera.str());
-	if (!stream.Open(camera)) {
+	if (!stream.OpenHost(camera)) {
 		log.printf("%s[%u]: Failed to connect to %s...\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s.%S").str(), index, camera.str());
 	}
 	

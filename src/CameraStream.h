@@ -12,10 +12,11 @@ public:
 
 	void SetUsernameAndPassword(const AString& _username, const AString& _password) {username = _username; password = _password;}
 	
-	virtual bool Open(const AString& _host);
+	virtual bool OpenHost(const AString& _host);
 
+	bool IsStreaming()    const {return (stage == Stage_Streaming);}
 	bool StreamComplete() const {return (stage >= Stage_Done);}
-
+	
 	class ImageHandler {
 	public:
 		ImageHandler() {}

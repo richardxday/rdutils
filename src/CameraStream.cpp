@@ -1,4 +1,6 @@
 
+#include <errno.h>
+
 #include <rdlib/StdMemFile.h>
 
 #include "CameraStream.h"
@@ -18,7 +20,7 @@ CameraStream::~CameraStream()
 	if (imagehandler && deleteimagehandler) delete imagehandler;
 }
 
-bool CameraStream::Open(const AString& _host)
+bool CameraStream::OpenHost(const AString& _host)
 {
 	camerahost = _host;
 	stage      = Stage_CameraControl;
@@ -48,7 +50,9 @@ bool CameraStream::Open()
 		_url = _url.SearchAndReplace("{username}", username).SearchAndReplace("{password}", password);
 
 		sstage  = StreamStage_Headers;
-		success = AHTTPRequest::Open(_url);
+		success = AHTTPRequest::OpenURL(_url);
+
+		if (success) SetReceiveBufferSize(32768);
 	}
 
 	return success;
@@ -67,16 +71,17 @@ void CameraStream::Cleanup()
 void CameraStream::ProcessData()
 {
 	if (stage == Stage_Streaming) {
-		while (data.size()) {
+		debug("Data received %u bytes, content %u bytes\n", (uint_t)pos, (uint_t)content.size());
+		
+		while (pos) {
 			if (sstage == StreamStage_ReadingData) {
 				uint_t oldlen = content.size();
-				uint_t newlen = MIN(oldlen + data.size(), contentlength);
+				uint_t newlen = MIN(oldlen + pos, contentlength);
 				uint_t nbytes = newlen - oldlen;
 				
 				content.resize(newlen);
 				memcpy(&content[oldlen], &data[0], nbytes);
-				if (data.size() > nbytes) memmove(&data[0], &data[nbytes], data.size() - nbytes);
-				data.resize(data.size() - nbytes);
+				RemoveBytes(nbytes);
 
 				if (content.size() >= contentlength) {
 					ProcessContent();
@@ -95,11 +100,10 @@ void CameraStream::ProcessData()
 					
 					ProcessHeader(header);
 				}
-				else if (data.size() >= maxlen) {
+				else if (pos >= maxlen) {
 					debug("Received garbage, dumping...\n");
 
-					memmove(&data[0], &data[maxlen], data.size() - maxlen);
-					data.resize(data.size() - maxlen);
+					RemoveBytes(maxlen);
 				}
 				else break;
 			}
