@@ -1,11 +1,12 @@
 bin_PROGRAMS =									\
 	agrep										\
+	cctvstream									\
+	countsmswords								\
 	imagecheck									\
 	imagediff									\
 	list										\
 	pingchecker									\
-	uri2uri										\
-	cctvstream
+	uri2uri
 
 agrep_LDADD =									\
 	$(RDLIB_LIBS)
@@ -69,5 +70,14 @@ cctvstream_CPPFLAGS =							\
 	$(RDUTILS_CFLAGS)
 
 cctvstream_SOURCES = cctvstream.cpp CameraStream.cpp MotionDetector.cpp
+
+countsmswords_LDADD =							\
+	$(RDLIB_LIBS)
+
+countsmswords_CPPFLAGS =						\
+	$(RDLIB_CFLAGS)								\
+	$(RDUTILS_CFLAGS)
+
+countsmswords_SOURCES = countsmswords.cpp
 
 DISTCLEANFILES =
