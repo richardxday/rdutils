@@ -21,8 +21,8 @@ MotionDetector::MotionDetector(ASocketServer& _server,
 
 	stream.SetImageHandler(this);
 	
-	diffavg = (double)stats.Get(AString("avg%u").Arg(index), "0.0");
-	diffsd  = (double)stats.Get(AString("sd%u").Arg(index),  "0.0");
+	diffavg = (double)stats.Get(AString("avg%").Arg(index), "0.0");
+	diffsd  = (double)stats.Get(AString("sd%").Arg(index),  "0.0");
 
 	log.printf("%s[%u]: New detector\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s.%S").str(), index);
 }
@@ -34,13 +34,13 @@ MotionDetector::~MotionDetector()
 
 AString MotionDetector::GetSetting(const AString& name, const AString& def) const
 {
-	AString nstr = AString("%u").Arg(index);	
+	AString nstr = AString("%").Arg(index);	
 	return settings.Get(nstr + ":" + name, settings.Get(name, def)).SearchAndReplace("{camera}", nstr);
 }
 
 void MotionDetector::Configure()
 {
-	AString nstr = AString("%u").Arg(index);
+	AString nstr = AString("%").Arg(index);
 	
 	log.printf("%s[%u]: Reading new settings...\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s.%S").str(), index);
 
@@ -225,8 +225,8 @@ void MotionDetector::ProcessImage(const ADateTime& dt, const AImage& image)
 		Interpolate(diffavg, avg2, coeff);
 		Interpolate(diffsd,  sd2,  coeff);
 
-		stats.Set(AString("avg%u").Arg(index), AString("%0.16le").Arg(diffavg));
-		stats.Set(AString("sd%u").Arg(index),  AString("%0.16le").Arg(diffsd));
+		stats.Set(AString("avg%").Arg(index), AString("%0.16e").Arg(diffavg));
+		stats.Set(AString("sd%").Arg(index),  AString("%0.16e").Arg(diffsd));
 
 		double diff = avgfactor * diffavg + sdfactor * diffsd, total = 0.0;
 		for (x = 0; x < len; x++) {
@@ -241,7 +241,7 @@ void MotionDetector::ProcessImage(const ADateTime& dt, const AImage& image)
 					   datestr.str(), index, total, diff);
 		}
 		
-		stats.Set(AString("level%u").Arg(index), AString("%0.4lf").Arg(total));
+		stats.Set(AString("level%").Arg(index), AString("%0.4").Arg(total));
 
 		if (total >= threshold) {
 			static const TAG tags[] = {
@@ -274,14 +274,14 @@ void MotionDetector::ProcessImage(const ADateTime& dt, const AImage& image)
 			image2.SaveJPEG(filename, tags);
 
 			if (detcmd.Valid()) {
-				AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4lf").Arg(total));
+				AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
 				if (system(cmd) != 0) {
 					log.printf("%s[%u]: Detection command '%s' failed\n", datestr.str(), index, cmd.str());
 				}
 			}
 		}
 		else if (nodetcmd.Valid()) {
-			AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4lf").Arg(total));
+			AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
 			if (system(cmd) != 0) {
 				log.printf("%s[%u]: No-detection command '%s' failed\n", datestr.str(), index, cmd.str());
 			}

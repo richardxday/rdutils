@@ -14,15 +14,15 @@ ImageDiffer::ImageDiffer(const ASettingsHandler& _settings, ASettingsHandler& _s
 	stats(_stats),
 	log(_log),
 	index(_index),
-	name(AString("imagediff%u").Arg(index)),
+	name(AString("imagediff%").Arg(index)),
 	settings(name, ~0),
 	sample(0),
 	verbose(0)
 {
 	imglist.SetDestructor(&__DeleteImage);
 	
-	diffavg = (double)stats.Get(AString("avg%u").Arg(index), "0.0");
-	diffsd  = (double)stats.Get(AString("sd%u").Arg(index),  "0.0");
+	diffavg = (double)stats.Get(AString("avg%").Arg(index), "0.0");
+	diffsd  = (double)stats.Get(AString("sd%").Arg(index),  "0.0");
 
 	Configure();
 
@@ -74,10 +74,10 @@ void ImageDiffer::Configure()
 {
 	settings.Read();
 
-	AString nstr = AString("%u").Arg(index);
+	AString nstr = AString("%").Arg(index);
 	wgetargs  = settings.Get("wgetargs",  		  global.Get("wgetargs"));
 	camurl    = settings.Get("cameraurl", 		  global.Get("cameraurl"));
-	tempfile  = settings.Get("tempfile", 		  global.Get("tempfile", AString("/home/%s/temp{index}.jpg").Arg(getenv("LOGNAME")))).SearchAndReplace("{index}", nstr);
+	tempfile  = settings.Get("tempfile", 		  global.Get("tempfile", AString("/home/%/temp{index}.jpg").Arg(getenv("LOGNAME")))).SearchAndReplace("{index}", nstr);
 	imagedir  = settings.Get("imagedir", 		  global.Get("imagedir", "/media/cctv")).SearchAndReplace("{index}", nstr);
 	imagefmt  = settings.Get("filename", 		  global.Get("filename", "%Y-%M-%D/%h/{index}/Image-%Y-%M-%D-%h-%m-%s-%S")).SearchAndReplace("{index}", nstr);
 	detimgdir = settings.Get("detimagedir", 	  global.Get("detimagedir")).SearchAndReplace("{index}", nstr);
@@ -259,8 +259,8 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 					Interpolate(diffavg, avg2, coeff);
 					Interpolate(diffsd,  sd2,  coeff);
 
-					stats.Set(AString("avg%u").Arg(index), AString("%0.16le").Arg(diffavg));
-					stats.Set(AString("sd%u").Arg(index),  AString("%0.16le").Arg(diffsd));
+					stats.Set(AString("avg%").Arg(index), AString("%0.16e").Arg(diffavg));
+					stats.Set(AString("sd%").Arg(index),  AString("%0.16e").Arg(diffsd));
 
 					double diff = avgfactor * diffavg + sdfactor * diffsd, total = 0.0;
 					for (x = 0; x < len; x++) {
@@ -272,7 +272,7 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 
 					if (verbose) log.printf("%s[%u]: Level = %0.1lf\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str(), index, total);
 
-					stats.Set(AString("level%u").Arg(index), AString("%0.4lf").Arg(total));
+					stats.Set(AString("level%").Arg(index), AString("%0.4").Arg(total));
 
 					if (total >= threshold) {
 						const TAG tags[] = {
@@ -305,14 +305,14 @@ void ImageDiffer::Process(const ADateTime&dt, bool update)
 						img2->image.SaveJPEG(filename, tags);
 
 						if (detcmd.Valid()) {
-							AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4lf").Arg(total));
+							AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
 							if (system(cmd) != 0) {
 								debug("Detection command '%s' failed\n", cmd.str());
 							}
 						}
 					}
 					else if (nodetcmd.Valid()) {
-						AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4lf").Arg(total));
+						AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
 						if (system(cmd) != 0) {
 							debug("No-detection command '%s' failed\n", cmd.str());
 						}
