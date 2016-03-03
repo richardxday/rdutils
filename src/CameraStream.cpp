@@ -25,10 +25,10 @@ bool CameraStream::OpenHost(const AString& _host)
 	camerahost = _host;
 	stage      = Stage_CameraControl;
 	
-	return Open();
+	return OpenStream();
 }
 
-bool CameraStream::Open()
+bool CameraStream::OpenStream()
 {
 	AString _url;
 	bool    success = false;
@@ -65,7 +65,7 @@ void CameraStream::Cleanup()
 	content.resize(0);
 	contentlength = 0;
 	
-	if ((++stage) < Stage_Done) Open();
+	if ((++stage) < Stage_Done) OpenStream();
 }
 
 void CameraStream::ProcessData()

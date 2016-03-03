@@ -5,15 +5,16 @@
 #include <rdlib/BMPImage.h>
 #include <rdlib/DateTime.h>
 
-class CameraStream : public AHTTPRequest {
+class CameraStream : private AHTTPRequest {
 public:
 	CameraStream(ASocketServer *_server = NULL);
 	virtual ~CameraStream();
-
+	
 	void SetUsernameAndPassword(const AString& _username, const AString& _password) {username = _username; password = _password;}
 	
 	virtual bool OpenHost(const AString& _host);
-
+	virtual void Close() {AHTTPRequest::Close();}
+	
 	bool IsStreaming()    const {return (stage == Stage_Streaming);}
 	bool StreamComplete() const {return (stage >= Stage_Done);}
 	
@@ -28,7 +29,8 @@ public:
 	virtual void SetImageHandler(ImageHandler *handler, bool del = false) {imagehandler = handler; deleteimagehandler = del;}
 	
 protected:
-	virtual bool Open();
+	using AHTTPRequest::Open;
+	virtual bool OpenStream();
 	virtual void Cleanup();
 	virtual void ProcessData();
 	virtual void ProcessHeader(const AString& header);
