@@ -1,11 +1,9 @@
 bin_PROGRAMS =									\
 	agrep										\
-	cctvstream									\
-	countsmswords								\
-	imagecheck									\
+	cmdsender									\
+	cmdserver									\
 	imagediff									\
 	list										\
-	pingchecker									\
 	uri2uri
 
 agrep_LDADD =									\
@@ -35,15 +33,6 @@ uri2uri_CPPFLAGS =								\
 
 uri2uri_SOURCES = uri2uri.cpp
 
-pingchecker_LDADD =								\
-	$(RDLIB_LIBS)
-
-pingchecker_CPPFLAGS =							\
-	$(RDLIB_CFLAGS)								\
-	$(RDUTILS_CFLAGS)
-
-pingchecker_SOURCES = pingchecker.cpp
-
 imagediff_LDADD =								\
 	$(RDLIB_LIBS)
 
@@ -53,31 +42,22 @@ imagediff_CPPFLAGS =							\
 
 imagediff_SOURCES = imagediff.cpp ImageDiffer.cpp
 
-imagecheck_LDADD =								\
+cmdsender_LDADD =								\
 	$(RDLIB_LIBS)
 
-imagecheck_CPPFLAGS =							\
+cmdsender_CPPFLAGS =							\
 	$(RDLIB_CFLAGS)								\
 	$(RDUTILS_CFLAGS)
 
-imagecheck_SOURCES = imagecheck.cpp
+cmdsender_SOURCES = cmdsender.cpp
 
-cctvstream_LDADD =								\
+cmdserver_LDADD =								\
 	$(RDLIB_LIBS)
 
-cctvstream_CPPFLAGS =							\
+cmdserver_CPPFLAGS =							\
 	$(RDLIB_CFLAGS)								\
 	$(RDUTILS_CFLAGS)
 
-cctvstream_SOURCES = cctvstream.cpp CameraStream.cpp MotionDetector.cpp
-
-countsmswords_LDADD =							\
-	$(RDLIB_LIBS)
-
-countsmswords_CPPFLAGS =						\
-	$(RDLIB_CFLAGS)								\
-	$(RDUTILS_CFLAGS)
-
-countsmswords_SOURCES = countsmswords.cpp
+cmdserver_SOURCES = cmdserver.cpp
 
 DISTCLEANFILES =
