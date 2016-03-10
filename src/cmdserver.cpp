@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 						   .SearchAndReplace("{date}", ADateTime().DateFormat("%Y-%M-%D"))
 						   .SearchAndReplace("{user}", getenv("LOGNAME"))
 						   .SearchAndReplace("{home}", getenv("HOME")));
-					if (system(cmd + " &") != 0) {
+					if (system(cmd) != 0) {
 						fprintf(stderr, "Command '%s' failed\n", line.str());
 					}
 				}
