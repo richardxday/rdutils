@@ -133,9 +133,9 @@ static bool __List(const FILE_INFO *file, void *Context)
 			str = str.SearchAndReplace("{ext}", file->FileName.Suffix());
 			str = str.SearchAndReplace("{mainname}", file->FileName.FilePart().Prefix());
 			str = str.SearchAndReplace("{dir}", file->FileName.PathPart());
-			str2.Format("%" FMT64 "u", file->FileSize); str = str.SearchAndReplace("{size}", str2);
-			str2.Format("%" FMT64 "u", (file->FileSize + 1023) / 1024); str = str.SearchAndReplace("{size-kb}", str2);
-			str2.Format("%" FMT64 "u", (file->FileSize + (1024 * 1024) - 1) / (1024 * 1024)); str = str.SearchAndReplace("{size-mb}", str2);
+			str2.Format("%s", AValue(file->FileSize).ToString().str()); str = str.SearchAndReplace("{size}", str2);
+			str2.Format("%s", AValue((file->FileSize + 1023) / 1024).ToString().str()); str = str.SearchAndReplace("{size-kb}", str2);
+			str2.Format("%s", AValue((file->FileSize + (1024 * 1024) - 1) / (1024 * 1024)).ToString().str()); str = str.SearchAndReplace("{size-mb}", str2);
 			str2.Format("%u", file->FileName.FilePart().GetLength()); str = str.SearchAndReplace("{filename-length}", str2);
 			str2.Format("%u", file->FileName.GetLength()); str = str.SearchAndReplace("{path-length}", str2);
 			str2 = file->WriteTime.DateToStr(); str = str.SearchAndReplace("{date}", str2);
