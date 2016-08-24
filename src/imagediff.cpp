@@ -5,6 +5,7 @@
 #include <signal.h>
 
 #include <vector>
+#include <algorithm>
 
 #include <rdlib/strsup.h>
 #include <rdlib/QuitHandler.h>
@@ -38,6 +39,7 @@ int main(void)
 
 	while (!quithandler.HasQuit()) {
 		ADateTime dt;
+		uint32_t  tick = GetTickCount();
 		uint32_t  days1;
 
 		if (update) {
@@ -82,10 +84,9 @@ int main(void)
 			statswritetime = GetTickCount();
 		}
 
-		uint64_t dt1    = dt;
-		uint64_t dt2    = ADateTime();
-		uint64_t msdiff = SUBZ(dt1 + delay, dt2);
-		Sleep((uint_t)msdiff);
+		uint32_t ticks = GetTickCount() - tick;
+		uint32_t diff  = SUBZ(ticks, delay);
+		Sleep((uint_t)std::max(diff, 1U));
 
 		if (hupsignal || settings.HasFileChanged()) {
 			log.printf("%s[all]: Reloading configuration\n", ADateTime().DateFormat("%Y-%M-%D %h:%m:%s").str());

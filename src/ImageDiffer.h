@@ -14,7 +14,7 @@ public:
 	ImageDiffer(const ASettingsHandler& _settings, ASettingsHandler& _stats, AStdFile& _log, uint_t _index);
 	~ImageDiffer();
 
-	void Process(const ADateTime&dt, bool update);
+	void Process(const ADateTime& dt, bool update);
 
 	static void Delete(uptr_t item, void *context) {
 		UNUSED(context);
@@ -23,9 +23,12 @@ public:
 
 protected:
 	typedef struct {
-		AString	filename;
-		AImage	image;
-		ARect	rect;
+		AString	  filename;
+		AImage	  image;
+		AImage	  detimage;
+		ARect	  rect;
+		ADateTime dt;
+		bool	  saved;
 	} IMAGE;
 
 	static void __DeleteImage(uptr_t item, void *context) {
@@ -35,6 +38,7 @@ protected:
 	}
 
 	IMAGE *CreateImage(AStdData& log, const char *filename, const IMAGE *img0);
+	void SaveImage(IMAGE *img);
 
 	void Configure();
 
@@ -55,6 +59,10 @@ protected:
 	AString   			  	detimgfmt;
 	AString					detcmd;
 	AString					nodetcmd;
+	AString					detstartcmd;
+	AString					detendcmd;
+	AImage					gainimage;
+	std::vector<float>		gaindata;
 	double    			  	diffavg;
 	double    			  	diffsd;
 	double    			  	coeff;
@@ -66,6 +74,10 @@ protected:
 	double    			  	threshold;
 	std::vector<float>		matrix;
 	float     			  	matmul;
+	uint_t					predetectionimages;
+	uint_t					postdetectionimages;
+	uint_t					forcesavecount;
+	uint_t					detcount;
 	uint_t    			  	matwid, mathgt;
 	uint_t				    subsample, sample;
 	uint32_t				statswritetime;
