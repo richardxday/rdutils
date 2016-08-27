@@ -8,13 +8,15 @@
 #include <rdlib/DateTime.h>
 #include <rdlib/SettingsHandler.h>
 #include <rdlib/BMPImage.h>
+#include <rdlib/Thread.h>
+#include <rdlib/ThreadLock.h>
 
-class ImageDiffer {
+class ImageDiffer : public AThread {
 public:
-	ImageDiffer(const ASettingsHandler& _settings, ASettingsHandler& _stats, AStdFile& _log, uint_t _index);
+	ImageDiffer(uint_t _index);
 	~ImageDiffer();
 
-	void Process(const ADateTime& dt, bool update);
+	static AString GetGlobalSetting(const AString& name, const AString& defval = "");
 
 	static void Delete(uptr_t item, void *context) {
 		UNUSED(context);
@@ -37,19 +39,46 @@ protected:
 		delete (IMAGE *)item;
 	}
 
-	IMAGE *CreateImage(AStdData& log, const char *filename, const IMAGE *img0);
+	IMAGE *CreateImage(const char *filename, const IMAGE *img0);
 	void SaveImage(IMAGE *img);
 
+	AString GetSetting(const AString& name, const AString& defval = "");
+	void CheckSettingsUpdate();
+
+	double  GetStat(const AString& name);
+	void    SetStat(const AString& name, double val);
+	
 	void Configure();
 
+	void Process();
+
+	virtual void *Run();
+
+	void Log(const char *fmt, ...);
+	void Log(uint_t index, const char *fmt, va_list ap);
+
+	class ProtectedSettings {
+	public:
+		ProtectedSettings(const AString& name, bool inhomedir = true, uint32_t iwritedelay = ~0) : settings(name, inhomedir, iwritedelay) {}
+		~ProtectedSettings() {}
+
+		ASettingsHandler& GetSettings() {return settings;}
+
+		operator AThreadLockObject& () {return tlock;}
+		
+	protected:
+		AThreadLockObject tlock;
+		ASettingsHandler  settings;
+	};
+
+	static ProtectedSettings& GetSettings();
+	static ProtectedSettings& GetStats();
+
 protected:
-	const ASettingsHandler& global;
-	ASettingsHandler&		stats;
-	AStdFile&				log;
 	uint_t					index;
-	AString					name;
-	ASettingsHandler 		settings;
 	ADataList				imglist;
+	AString					logpath;
+	uint_t					delay;
 	AString   			  	wgetargs;
 	AString   			  	cameraurl;
 	AString   			  	videosrc;
@@ -82,9 +111,10 @@ protected:
 	uint_t					forcesavecount;
 	uint_t					detcount;
 	uint_t    			  	matwid, mathgt;
-	uint_t				    subsample, sample;
-	uint32_t				statswritetime;
+	uint_t					settingschange;
 	uint_t				    verbose;
+	
+	static uint_t			settingschangecount;
 };
 
 #endif
