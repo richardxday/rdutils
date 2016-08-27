@@ -27,7 +27,7 @@ int main(void)
 	ASettingsHandler stats("imagediff-stats", 5000);
 	AString  		 loglocation;
 	AStdFile  		 log;
-	uint64_t 		 delay   = 0;
+	uint32_t 		 delay   = 0;
 	uint32_t  		 days    = 0;
 	uint32_t		 statswritetime = GetTickCount();
 	bool			 update  = true;
@@ -46,7 +46,7 @@ int main(void)
 			settings.Read();
 
 			loglocation = settings.Get("loglocation", "/var/log/imagediff");
-			delay       = (uint64_t)(1000.0 * (double)settings.Get("delay", "1.0"));
+			delay       = (uint32_t)(1000.0 * (double)settings.Get("delay", "1.0"));
 			days        = 0;
 		}
 
@@ -85,7 +85,7 @@ int main(void)
 		}
 
 		uint32_t ticks = GetTickCount() - tick;
-		uint32_t diff  = SUBZ(ticks, delay);
+		uint32_t diff  = SUBZ(delay, ticks);
 		Sleep((uint_t)std::max(diff, 1U));
 
 		if (hupsignal || settings.HasFileChanged()) {

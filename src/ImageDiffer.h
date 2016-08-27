@@ -51,7 +51,10 @@ protected:
 	ASettingsHandler 		settings;
 	ADataList				imglist;
 	AString   			  	wgetargs;
-	AString   			  	camurl;
+	AString   			  	cameraurl;
+	AString   			  	videosrc;
+	AString					streamerargs;
+	AString					capturecmd;
 	AString   			  	tempfile;
 	AString   			  	imagedir;
 	AString   			  	imagefmt;
