@@ -159,6 +159,20 @@ void ImageDiffer::Configure()
 	threshold 	 = (double)GetSetting("threshold", "3000.0");
 	verbose   	 = (uint_t)GetSetting("verbose",   "0");
 
+	cmd.Delete();
+	if (cameraurl.Valid()) {
+		cmd.printf("wget %s \"%s\" -O %s 2>/dev/null", wgetargs.str(), cameraurl.str(), tempfile.str());
+	}
+	else if (videosrc.Valid()) {
+		cmd.printf("streamer -c /dev/%s %s -o %s 2>/dev/null", videosrc.str(), streamerargs.str(), tempfile.str());
+	}
+	else if (capturecmd.Valid()) {
+		cmd.printf("%s 2>/dev/null", capturecmd.SearchAndReplace("{file}", tempfile).str());
+	}
+	else Log("No valid capture command!");
+
+	Log("Capture command '%s'", cmd.str());
+	
 	detcount     = 0;
 
 	gainimage.Delete();
@@ -278,286 +292,273 @@ void ImageDiffer::Process()
 		}
 	}
 	
-	AString cmd;
-	if (cameraurl.Valid()) {
-		cmd.printf("wget %s \"%s\" -O %s 2>/dev/null", wgetargs.str(), cameraurl.str(), tempfile.str());
-	}
-	else if (videosrc.Valid()) {
-		cmd.printf("streamer -c /dev/%s %s -o %s 2>/dev/null", videosrc.str(), streamerargs.str(), tempfile.str());
-	}
-	else if (capturecmd.Valid()) {
-		cmd.printf("%s 2>/dev/null", capturecmd.SearchAndReplace("{file}", tempfile).str());
-	}
+	if (cmd.Valid() && (system(cmd) == 0)) {
+		ADateTime dt;
+		IMAGE *img;
 
-	if (cmd.Valid()) {
-		if (system(cmd) == 0) {
-			ADateTime dt;
-			IMAGE *img;
-
-			if ((img = CreateImage(tempfile, (const IMAGE *)imglist[imglist.Count() - 1])) != NULL) {
-				img->dt = dt;
+		if ((img = CreateImage(tempfile, (const IMAGE *)imglist[imglist.Count() - 1])) != NULL) {
+			img->dt = dt;
 				
-				imglist.Add(img);
+			imglist.Add(img);
 
-				// strip unneeded images off start of image list
-				// need to keep at least 2 and at least predetectionimages+1 images
-				while ((imglist.Count() > 2) && (imglist.Count() > (predetectionimages + 1))) {
-					delete (IMAGE *)imglist[0];
-					imglist.Pop();
+			// strip unneeded images off start of image list
+			// need to keep at least 2 and at least predetectionimages+1 images
+			while ((imglist.Count() > 2) && (imglist.Count() > (predetectionimages + 1))) {
+				delete (IMAGE *)imglist[0];
+				imglist.Pop();
+			}
+
+			// if there are enough images to compare
+			if (imglist.Count() >= 2) {
+				const IMAGE *img1 = (const IMAGE *)imglist[imglist.Count() - 2];
+				IMAGE *img2       = (IMAGE       *)imglist[imglist.Count() - 1];
+				const AImage::PIXEL *pix1 = img1->image.GetPixelData();
+				const AImage::PIXEL *pix2 = img2->image.GetPixelData();
+				const ARect& rect = img1->rect;
+				std::vector<float> data;
+				float *ptr, *p;
+				double avg[3];
+				const uint_t w = rect.w, h = rect.h, w3 = w * 3, len = w * h, len3 = w3 * h;
+				uint_t x, y;
+					
+				data.resize(len3);
+				ptr = &data[0];
+
+				memset(avg, 0, sizeof(avg));
+
+				// find difference between the two images and
+				// normalize against average on each line per component
+				for (y = 0, p = ptr; y < h; y++) {
+					double yavg[3];
+
+					// reset average
+					memset(yavg, 0, sizeof(yavg));
+
+					// subtract pixels and update per-component average
+					for (x = 0; x < w; x++, p += 3, pix1++, pix2++) {
+						p[0]     = ((float)pix1->r - (float)pix2->r) * redscale;
+						p[1]     = ((float)pix1->g - (float)pix2->g) * grnscale;
+						p[2]     = ((float)pix1->b - (float)pix2->b) * bluscale;
+
+						yavg[0] += p[0];
+						yavg[1] += p[1];
+						yavg[2] += p[2];
+					}
+
+					yavg[0] /= (double)w;
+					yavg[1] /= (double)w;
+					yavg[2] /= (double)w;
+
+					// subtract average from each pixel
+					// and update total average
+					p -= 3 * w;
+					for (x = 0; x < w; x++, p += 3) {
+						p[0] -= yavg[0]; avg[0] += p[0];
+						p[1] -= yavg[1]; avg[1] += p[1];
+						p[2] -= yavg[2]; avg[2] += p[2];
+					}
 				}
 
-				// if there are enough images to compare
-				if (imglist.Count() >= 2) {
-					const IMAGE *img1 = (const IMAGE *)imglist[imglist.Count() - 2];
-					IMAGE *img2       = (IMAGE       *)imglist[imglist.Count() - 1];
-					const AImage::PIXEL *pix1 = img1->image.GetPixelData();
-					const AImage::PIXEL *pix2 = img2->image.GetPixelData();
-					const ARect& rect = img1->rect;
-					std::vector<float> data;
-					float *ptr, *p;
-					double avg[3];
-					const uint_t w = rect.w, h = rect.h, w3 = w * 3, len = w * h, len3 = w3 * h;
-					uint_t x, y;
-					
-					data.resize(len3);
-					ptr = &data[0];
+				avg[0] /= (double)len;
+				avg[1] /= (double)len;
+				avg[2] /= (double)len;
 
-					memset(avg, 0, sizeof(avg));
+				// update gaindata array from gainimage - gaindata array is same size as the incoming images
+				// whatever the size of the original gainimage is
+				// an invalid gainimage results in a single value (white) used throughout gaindata
+				{
+					const uint_t gainwid = gainimage.GetRect().w;
+					const uint_t gainhgt = gainimage.GetRect().h;
+					uint_t i = 0, n = w * h * 3;
 
-					// find difference between the two images and
-					// normalize against average on each line per component
-					for (y = 0, p = ptr; y < h; y++) {
-						double yavg[3];
-
-						// reset average
-						memset(yavg, 0, sizeof(yavg));
-
-						// subtract pixels and update per-component average
-						for (x = 0; x < w; x++, p += 3, pix1++, pix2++) {
-							p[0]     = ((float)pix1->r - (float)pix2->r) * redscale;
-							p[1]     = ((float)pix1->g - (float)pix2->g) * grnscale;
-							p[2]     = ((float)pix1->b - (float)pix2->b) * bluscale;
-
-							yavg[0] += p[0];
-							yavg[1] += p[1];
-							yavg[2] += p[2];
-						}
-
-						yavg[0] /= (double)w;
-						yavg[1] /= (double)w;
-						yavg[2] /= (double)w;
-
-						// subtract average from each pixel
-						// and update total average
-						p -= 3 * w;
-						for (x = 0; x < w; x++, p += 3) {
-							p[0] -= yavg[0]; avg[0] += p[0];
-							p[1] -= yavg[1]; avg[1] += p[1];
-							p[2] -= yavg[2]; avg[2] += p[2];
-						}
-					}
-
-					avg[0] /= (double)len;
-					avg[1] /= (double)len;
-					avg[2] /= (double)len;
-
-					// update gaindata array from gainimage - gaindata array is same size as the incoming images
-					// whatever the size of the original gainimage is
-					// an invalid gainimage results in a single value (white) used throughout gaindata
-					{
-						const uint_t gainwid = gainimage.GetRect().w;
-						const uint_t gainhgt = gainimage.GetRect().h;
-						uint_t i = 0, n = w * h * 3;
-
-						// resize and recalculate gaindata array if necessary
-						if (n != gaindata.size()) {
-							static const AImage::PIXEL white = {255, 255, 255, 0};
-							const AImage::PIXEL *gainptr = gainimage.GetPixelData() ? gainimage.GetPixelData() : &white;
-							float sum = 0.f;
+					// resize and recalculate gaindata array if necessary
+					if (n != gaindata.size()) {
+						static const AImage::PIXEL white = {255, 255, 255, 0};
+						const AImage::PIXEL *gainptr = gainimage.GetPixelData() ? gainimage.GetPixelData() : &white;
+						float sum = 0.f;
 								
-							gaindata.resize(n);
+						gaindata.resize(n);
 
-							for (y = 0; y < h; y++) {
-								// convert detection y into gainimage y
-								const uint_t y2 = (y * gainhgt + h / 2) / h;
-
-								for (x = 0; x < w; x++) {
-									// convert detection x into gainimage x
-									const uint_t x2 = (x * gainwid + w / 2) / w;
-									// get ptr to pixel data
-									const AImage::PIXEL *p = gainptr + x2 + y2 * gainwid;
-
-									// convert pixel into RGB floating point values 0-1
-									gaindata[i] = (float)p->r / 255.f; sum += gaindata[i++];
-									gaindata[i] = (float)p->g / 255.f; sum += gaindata[i++];
-									gaindata[i] = (float)p->b / 255.f; sum += gaindata[i++];
-								}
-							}
-
-							// scale all gain data up so it sums to w * h * 3 
-							if (sum > 0.f) {
-								sum = (float)n / sum;
-
-								for (i = 0; i < n; i++) gaindata[i] *= sum;
-							}
-						}
-					}
-
-					// subtract overall average from pixel data, scale by gain image and
-					// calculate modulus
-					float *p2, *p3;
-					for (y = 0, p = ptr, p2 = ptr, p3 = &gaindata[0]; y < h; y++) {
-						for (x = 0; x < w; x++, p += 3, p2++, p3 += 3) {
-							p[0] -= avg[0];
-							p[1] -= avg[1];
-							p[2] -= avg[2];
-							p[0] *= p3[0];
-							p[1] *= p3[1];
-							p[2] *= p3[2];
-							p2[0] = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
-						}
-					}
-
-					// find average and SD of resultant difference data with matrix applied
-					double avg2 = 0.0, sd2 = 0.0;
-					uint_t mx, my, cx = (matwid - 1) >> 1, cy = (mathgt - 1) >> 1;
-					for (x = 0; x < w; x++) {
 						for (y = 0; y < h; y++) {
-							float val = 0.f;
+							// convert detection y into gainimage y
+							const uint_t y2 = (y * gainhgt + h / 2) / h;
 
-							// apply matrix to data
-							if (matwid && mathgt) {
-								for (my = 0; my < mathgt; my++) {
-									if (((y + my) >= cy) && ((y + my) < (h + cy))) {
-										for (mx = 0; mx < matwid; mx++) {
-											if (((x + mx) >= cx) && ((x + mx) < (h + cx))) {
-												val += matrix[mx + my * matwid] * ptr[(x + mx - cx) + (y + my - cy) * w];
-											}
+							for (x = 0; x < w; x++) {
+								// convert detection x into gainimage x
+								const uint_t x2 = (x * gainwid + w / 2) / w;
+								// get ptr to pixel data
+								const AImage::PIXEL *p = gainptr + x2 + y2 * gainwid;
+
+								// convert pixel into RGB floating point values 0-1
+								gaindata[i] = (float)p->r / 255.f; sum += gaindata[i++];
+								gaindata[i] = (float)p->g / 255.f; sum += gaindata[i++];
+								gaindata[i] = (float)p->b / 255.f; sum += gaindata[i++];
+							}
+						}
+
+						// scale all gain data up so it sums to w * h * 3 
+						if (sum > 0.f) {
+							sum = (float)n / sum;
+
+							for (i = 0; i < n; i++) gaindata[i] *= sum;
+						}
+					}
+				}
+
+				// subtract overall average from pixel data, scale by gain image and
+				// calculate modulus
+				float *p2, *p3;
+				for (y = 0, p = ptr, p2 = ptr, p3 = &gaindata[0]; y < h; y++) {
+					for (x = 0; x < w; x++, p += 3, p2++, p3 += 3) {
+						p[0] -= avg[0];
+						p[1] -= avg[1];
+						p[2] -= avg[2];
+						p[0] *= p3[0];
+						p[1] *= p3[1];
+						p[2] *= p3[2];
+						p2[0] = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+					}
+				}
+
+				// find average and SD of resultant difference data with matrix applied
+				double avg2 = 0.0, sd2 = 0.0;
+				uint_t mx, my, cx = (matwid - 1) >> 1, cy = (mathgt - 1) >> 1;
+				for (x = 0; x < w; x++) {
+					for (y = 0; y < h; y++) {
+						float val = 0.f;
+
+						// apply matrix to data
+						if (matwid && mathgt) {
+							for (my = 0; my < mathgt; my++) {
+								if (((y + my) >= cy) && ((y + my) < (h + cy))) {
+									for (mx = 0; mx < matwid; mx++) {
+										if (((x + mx) >= cx) && ((x + mx) < (h + cx))) {
+											val += matrix[mx + my * matwid] * ptr[(x + mx - cx) + (y + my - cy) * w];
 										}
 									}
 								}
-
-								val *= matmul;
 							}
-							// or just use original if no matrix
-							else val = ptr[x + y * w];
 
-							// store data somewhere else (beyond original data) to prevent alteration of data used by matrix calculation
-							ptr[w * h + x + y * w] = (float)val;
-
-							// update average and SD
-							avg2 += val;
-							sd2  += val * val;
+							val *= matmul;
 						}
+						// or just use original if no matrix
+						else val = ptr[x + y * w];
+
+						// store data somewhere else (beyond original data) to prevent alteration of data used by matrix calculation
+						ptr[w * h + x + y * w] = (float)val;
+
+						// update average and SD
+						avg2 += val;
+						sd2  += val * val;
 					}
+				}
 
-					// calculate final average and SD
-					avg2 /= (double)len;
-					sd2   = sqrt(sd2 / (double)len - avg2 * avg2);
+				// calculate final average and SD
+				avg2 /= (double)len;
+				sd2   = sqrt(sd2 / (double)len - avg2 * avg2);
 
-					// filter values
-					Interpolate(diffavg, avg2, coeff);
-					Interpolate(diffsd,  sd2,  coeff);
+				// filter values
+				Interpolate(diffavg, avg2, coeff);
+				Interpolate(diffsd,  sd2,  coeff);
 
-					// store values in settings handler
-					SetStat("avg", diffavg);
-					SetStat("sd",  diffsd);
+				// store values in settings handler
+				SetStat("avg", diffavg);
+				SetStat("sd",  diffsd);
 
-					// calculate minimum level based on average and SD values, individual levels must exceed this
-					double diff = avgfactor * diffavg + sdfactor * diffsd, total = 0.0;
-					// find total = sum of levels above minimum level
-					for (x = 0; x < len; x++) {
-						ptr[x] = std::max(ptr[w * h + x] - diff, 0.0);
-						total += ptr[x];
-					}
+				// calculate minimum level based on average and SD values, individual levels must exceed this
+				double diff = avgfactor * diffavg + sdfactor * diffsd, total = 0.0;
+				// find total = sum of levels above minimum level
+				for (x = 0; x < len; x++) {
+					ptr[x] = std::max(ptr[w * h + x] - diff, 0.0);
+					total += ptr[x];
+				}
 
-					// divide by area of image and multiply up to make values arbitarily scaled
-					total = total * 1000.0 / (double)len;
+				// divide by area of image and multiply up to make values arbitarily scaled
+				total = total * 1000.0 / (double)len;
 
-					if (verbose) Log("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)", total, avg2, sd2, diffavg, diffsd, diff);
+				if (verbose) Log("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)", total, avg2, sd2, diffavg, diffsd, diff);
 
-					SetStat("level", total);
+				SetStat("level", total);
 						
-					// create detection image, if detection image directory valid
-					if (detimgdir.Valid() && img2->detimage.Create(rect.w, rect.h)) {
-						const AImage::PIXEL *pixel1 = img1->image.GetPixelData();
-						const AImage::PIXEL *pixel2 = img2->image.GetPixelData();
-						AImage::PIXEL *pixel = img2->detimage.GetPixelData();
+				// create detection image, if detection image directory valid
+				if (detimgdir.Valid() && img2->detimage.Create(rect.w, rect.h)) {
+					const AImage::PIXEL *pixel1 = img1->image.GetPixelData();
+					const AImage::PIXEL *pixel2 = img2->image.GetPixelData();
+					AImage::PIXEL *pixel = img2->detimage.GetPixelData();
 
-						// use individual level from above and scale and max RGB values from original images
-						for (x = 0; x < len; x++, pixel++, pixel1++, pixel2++) {
-							pixel->r = (uint8_t)limit((double)std::max(pixel1->r, pixel2->r) * ptr[x] / 255.0, 0.0, 255.0);
-							pixel->g = (uint8_t)limit((double)std::max(pixel1->g, pixel2->g) * ptr[x] / 255.0, 0.0, 255.0);
-							pixel->b = (uint8_t)limit((double)std::max(pixel1->b, pixel2->b) * ptr[x] / 255.0, 0.0, 255.0);
+					// use individual level from above and scale and max RGB values from original images
+					for (x = 0; x < len; x++, pixel++, pixel1++, pixel2++) {
+						pixel->r = (uint8_t)limit((double)std::max(pixel1->r, pixel2->r) * ptr[x] / 255.0, 0.0, 255.0);
+						pixel->g = (uint8_t)limit((double)std::max(pixel1->g, pixel2->g) * ptr[x] / 255.0, 0.0, 255.0);
+						pixel->b = (uint8_t)limit((double)std::max(pixel1->b, pixel2->b) * ptr[x] / 255.0, 0.0, 255.0);
+					}
+				}
+
+				// should image(s) be saved?
+				if ((total >= threshold) || forcesavecount) {
+					uint_t i;
+
+					// save predetectionimages plus current image from image list (if they have not already been saved)
+
+					// calculate starting position in list
+					if (imglist.Count() >= (predetectionimages + 1)) i = imglist.Count() - (predetectionimages + 1);
+					else										     i = 0;
+
+					// save any unsaved images, including latest
+					for (; i < imglist.Count(); i++) {
+						SaveImage((IMAGE *)imglist[i]);
+					}
+
+					// if a detection has been found, force the next postdetectionimages to be saved
+					if		(total >= threshold) forcesavecount = postdetectionimages;
+					// else decrement forcesavecount
+					else if (forcesavecount)	 forcesavecount--;
+				}
+
+				if (total >= threshold) {
+					// start if detection?
+					if (!detcount && detstartcmd.Valid()) {
+						AString cmd = detstartcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
+						if (system(cmd) != 0) {
+							Log("Detection start command '%s' failed", cmd.str());
 						}
 					}
 
-					// should image(s) be saved?
-					if ((total >= threshold) || forcesavecount) {
-						uint_t i;
+					// increment detection count
+					detcount++;
 
-						// save predetectionimages plus current image from image list (if they have not already been saved)
-
-						// calculate starting position in list
-						if (imglist.Count() >= (predetectionimages + 1)) i = imglist.Count() - (predetectionimages + 1);
-						else										     i = 0;
-
-						// save any unsaved images, including latest
-						for (; i < imglist.Count(); i++) {
-							SaveImage((IMAGE *)imglist[i]);
-						}
-
-						// if a detection has been found, force the next postdetectionimages to be saved
-						if		(total >= threshold) forcesavecount = postdetectionimages;
-						// else decrement forcesavecount
-						else if (forcesavecount)	 forcesavecount--;
-					}
-
-					if (total >= threshold) {
-						// start if detection?
-						if (!detcount && detstartcmd.Valid()) {
-							AString cmd = detstartcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
-							if (system(cmd) != 0) {
-								Log("Detection start command '%s' failed", cmd.str());
-							}
-						}
-
-						// increment detection count
-						detcount++;
-
-						// run detection command
-						if (detcmd.Valid()) {
-							AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total)).SearchAndReplace("{detcount}", AString("%").Arg(detcount));
-							if (system(cmd) != 0) {
-								Log("Detection command '%s' failed", cmd.str());
-							}
+					// run detection command
+					if (detcmd.Valid()) {
+						AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total)).SearchAndReplace("{detcount}", AString("%").Arg(detcount));
+						if (system(cmd) != 0) {
+							Log("Detection command '%s' failed", cmd.str());
 						}
 					}
-					else {
-						// if there's been some detections, run detection end command
-						if (detcount && detendcmd.Valid()) {
-							AString cmd = detendcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total)).SearchAndReplace("{detcount}", AString("%").Arg(detcount));
-							if (system(cmd) != 0) {
-								Log("Detection end command '%s' failed", cmd.str());
-							}
+				}
+				else {
+					// if there's been some detections, run detection end command
+					if (detcount && detendcmd.Valid()) {
+						AString cmd = detendcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total)).SearchAndReplace("{detcount}", AString("%").Arg(detcount));
+						if (system(cmd) != 0) {
+							Log("Detection end command '%s' failed", cmd.str());
 						}
+					}
 
-						// reset detection count
-						detcount = 0;
+					// reset detection count
+					detcount = 0;
 						
-						// if not a detection, run non-detection command
-						if (nodetcmd.Valid()) {
-							AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
-							if (system(cmd) != 0) {
-								Log("No-detection command '%s' failed", cmd.str());
-							}
+					// if not a detection, run non-detection command
+					if (nodetcmd.Valid()) {
+						AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4").Arg(total));
+						if (system(cmd) != 0) {
+							Log("No-detection command '%s' failed", cmd.str());
 						}
 					}
 				}
 			}
 		}
-		else Log("Failed to fetch image using '%s'", cmd.str());
 	}
+	else Log("Failed to fetch image using '%s'", cmd.str());
 }
 
 void ImageDiffer::SaveImage(IMAGE *img)
@@ -593,12 +594,15 @@ void *ImageDiffer::Run()
 	while (!quitthread) {
 		CheckSettingsUpdate();
 
-		uint32_t tick  = GetTickCount();
-		Process();
-		uint32_t ticks = GetTickCount() - tick;
-		uint32_t diff  = SUBZ(delay, ticks);
-
-		Sleep(diff | 1);
+		if (cmd.Valid()) {
+			uint32_t tick  = GetTickCount();
+			Process();
+			uint32_t ticks = GetTickCount() - tick;
+			uint32_t diff  = SUBZ(delay, ticks);
+			
+			Sleep(diff | 1);
+		}
+		else Sleep(500);
 	}
 
 	return NULL;

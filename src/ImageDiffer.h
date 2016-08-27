@@ -85,6 +85,7 @@ protected:
 	AString					streamerargs;
 	AString					capturecmd;
 	AString   			  	tempfile;
+	AString					cmd;
 	AString   			  	imagedir;
 	AString   			  	imagefmt;
 	AString   			  	detimgdir;
