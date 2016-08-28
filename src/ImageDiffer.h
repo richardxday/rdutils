@@ -30,6 +30,10 @@ protected:
 		AImage	  detimage;
 		ARect	  rect;
 		ADateTime dt;
+		double    avg;
+		double    sd;
+		double	  diff;
+		double	  level;
 		bool	  saved;
 	} IMAGE;
 
@@ -50,7 +54,7 @@ protected:
 	
 	void Configure();
 
-	void Process();
+	void Process(const ADateTime& dt);
 
 	virtual void *Run();
 
@@ -79,6 +83,7 @@ protected:
 	ADataList				imglist;
 	AString					logpath;
 	uint_t					delay;
+	AString					name;
 	AString   			  	wgetargs;
 	AString   			  	cameraurl;
 	AString   			  	videosrc;
@@ -88,6 +93,7 @@ protected:
 	AString					cmd;
 	AString   			  	imagedir;
 	AString   			  	imagefmt;
+	AString   			  	detlogfmt;
 	AString   			  	detimgdir;
 	AString   			  	detimgfmt;
 	AString					detcmd;
@@ -105,6 +111,7 @@ protected:
 	double    			  	grnscale;
 	double    			  	bluscale;
 	double    			  	threshold;
+	double    			  	logthreshold;
 	std::vector<float>		matrix;
 	float     			  	matmul;
 	uint_t					predetectionimages;
