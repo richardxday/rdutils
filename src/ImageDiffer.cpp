@@ -135,30 +135,53 @@ void ImageDiffer::Configure()
 {
 	AString indexstr = AString("%").Arg(index);
 	logpath      = GetSetting("loglocation", "/var/log/imagediff");
+	name         = GetSetting("name");
 	delay        = (uint_t)(1000.0 * (double)GetSetting("delay", "1"));
 	wgetargs  	 = GetSetting("wgetargs");
 	cameraurl    = GetSetting("cameraurl");
 	videosrc     = GetSetting("videosrc");
 	streamerargs = GetSetting("streamerargs", "-s 640x480");
 	capturecmd   = GetSetting("capturecmd").DeEscapify();
-	tempfile  	 = GetSetting("tempfile", AString("/home/%/temp-{index}.jpeg").Arg(getenv("LOGNAME"))).SearchAndReplace("{index}", indexstr);
-	imagedir  	 = GetSetting("imagedir", "/media/cctv").SearchAndReplace("{index}", indexstr);
-	imagefmt  	 = GetSetting("filename", "{index}/%Y-%M-%D/%h/Image-%Y-%M-%D-%h-%m-%s-%S").SearchAndReplace("{index}", indexstr);
-	detimgdir 	 = GetSetting("detimagedir").SearchAndReplace("{imagedir}", imagedir).SearchAndReplace("{index}", indexstr);
-	detimgfmt 	 = GetSetting("detfilename", "{imagepath}/detection/{imagename}").SearchAndReplace("{imagepath}", imagefmt.PathPart()).SearchAndReplace("{imagename}", imagefmt.FilePart()).SearchAndReplace("{index}", indexstr);
+	tempfile  	 = (GetSetting("tempfile", AString("/home/%/temp-{index}.jpeg").Arg(getenv("LOGNAME"))).
+					SearchAndReplace("{index}", indexstr));
+	imagedir  	 = (GetSetting("imagedir", "/media/cctv").
+					SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
+					SearchAndReplace("{index}",     indexstr));
+	imagefmt  	 = (GetSetting("filename", "%Y-%M-%D-{name}/%h/Image-%Y-%M-%D-%h-%m-%s-%S").
+					SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
+					SearchAndReplace("{index}",     indexstr));
+	detlogfmt 	 = (GetSetting("detlogfilename", "detection.dat").
+					SearchAndReplace("{imagepath}", imagefmt.PathPart()).
+					SearchAndReplace("{imagename}", imagefmt.FilePart()).
+					SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
+					SearchAndReplace("{index}", 	indexstr));
+	detimgdir 	 = (GetSetting("detimagedir").
+					SearchAndReplace("{imagedir}",  imagedir).
+					SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
+					SearchAndReplace("{index}",     indexstr));
+	detimgfmt 	 = (GetSetting("detfilename", "{imagepath}/detection/{imagename}").
+					SearchAndReplace("{imagepath}", imagefmt.PathPart()).
+					SearchAndReplace("{imagename}", imagefmt.FilePart()).
+					SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
+					SearchAndReplace("{index}", 	indexstr));
 	detcmd    	 = GetSetting("detcommand").SearchAndReplace("{index}", indexstr);
 	detstartcmd  = GetSetting("detstartcommand").SearchAndReplace("{index}", indexstr);
 	detendcmd    = GetSetting("detendcommand").SearchAndReplace("{index}", indexstr);
 	nodetcmd  	 = GetSetting("nodetcommand").SearchAndReplace("{index}", indexstr);
-	coeff  	  	 = (double)GetSetting("coeff", 	   "1.0e-3");
-	avgfactor 	 = (double)GetSetting("avgfactor", "1.0");
-	sdfactor  	 = (double)GetSetting("sdfactor",  "2.0");
-	redscale  	 = (double)GetSetting("rscale",    "1.0");
-	grnscale  	 = (double)GetSetting("gscale",    "1.0");
-	bluscale  	 = (double)GetSetting("bscale",    "1.0");
-	threshold 	 = (double)GetSetting("threshold", "3000.0");
-	verbose   	 = (uint_t)GetSetting("verbose",   "0");
+	coeff  	  	 = (double)GetSetting("coeff", 	   	  "1.0e-3");
+	avgfactor 	 = (double)GetSetting("avgfactor", 	  "1.0");
+	sdfactor  	 = (double)GetSetting("sdfactor",  	  "2.0");
+	redscale  	 = (double)GetSetting("rscale",    	  "1.0");
+	grnscale  	 = (double)GetSetting("gscale",    	  "1.0");
+	bluscale  	 = (double)GetSetting("bscale",    	  "1.0");
+	threshold 	 = (double)GetSetting("threshold", 	  "3000.0");
+	logthreshold = (double)GetSetting("logthreshold", "{threshold}").SearchAndReplace("{threshold}", GetSetting("threshold", "3000.0"));
+	verbose   	 = (uint_t)GetSetting("verbose",      "0");
 
+	Log("Destination '%s'", imagedir.CatPath(imagefmt).str());
+	if (detimgdir.Valid()) Log("Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
+	if (detlogfmt.Valid()) Log("Detection log '%s' with threshold %0.1lf", imagedir.CatPath(detlogfmt).str(), logthreshold);
+	
 	cmd.Delete();
 	if (cameraurl.Valid()) {
 		cmd.printf("wget %s \"%s\" -O %s 2>/dev/null", wgetargs.str(), cameraurl.str(), tempfile.str());
@@ -173,7 +196,7 @@ void ImageDiffer::Configure()
 
 	Log("Capture command '%s'", cmd.str());
 	
-	detcount     = 0;
+	detcount = 0;
 
 	gainimage.Delete();
 	AString gainfilename = GetSetting("gainimage");
@@ -189,10 +212,10 @@ void ImageDiffer::Configure()
 	
 	predetectionimages  = (uint_t)GetSetting("predetectionimages",  "2");
 	postdetectionimages = (uint_t)GetSetting("postdetectionimages", "2");
-	forcesavecount    = 0;
+	forcesavecount      = 0;
 	
-	matmul 	  = 1.f;
-	matwid 	  = mathgt = 0;
+	matmul = 1.f;
+	matwid = mathgt = 0;
 	
 	AString _matrix = GetSetting("matrix");
 	if (_matrix.Valid()) {
@@ -281,19 +304,9 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *
 	return img;
 }
 
-void ImageDiffer::Process()
+void ImageDiffer::Process(const ADateTime& dt)
 {
-	{
-		uint_t newsettingscount = settingschangecount;
-		if (newsettingscount != settingschange) {
-			settingschange = newsettingscount;
-			Log("Re-configuring");
-			Configure();
-		}
-	}
-	
 	if (cmd.Valid() && (system(cmd) == 0)) {
-		ADateTime dt;
 		IMAGE *img;
 
 		if ((img = CreateImage(tempfile, (const IMAGE *)imglist[imglist.Count() - 1])) != NULL) {
@@ -457,6 +470,10 @@ void ImageDiffer::Process()
 				avg2 /= (double)len;
 				sd2   = sqrt(sd2 / (double)len - avg2 * avg2);
 
+				// save values
+				img2->avg = avg2;
+				img2->sd  = sd2;
+
 				// filter values
 				Interpolate(diffavg, avg2, coeff);
 				Interpolate(diffsd,  sd2,  coeff);
@@ -475,6 +492,9 @@ void ImageDiffer::Process()
 
 				// divide by area of image and multiply up to make values arbitarily scaled
 				total = total * 1000.0 / (double)len;
+
+				img2->diff  = diff;
+				img2->level = total;
 
 				if (verbose) Log("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)", total, avg2, sd2, diffavg, diffsd, diff);
 
@@ -555,6 +575,28 @@ void ImageDiffer::Process()
 						}
 					}
 				}
+				
+				// save detection data
+				if ((total >= logthreshold) && detlogfmt.Valid()) {
+					static AThreadLockObject tlock;
+					AString  	filename = imagedir.CatPath(dt.DateFormat(detlogfmt));
+					AStdFile 	fp;
+					AThreadLock lock(tlock);
+			
+					CreateDirectory(filename.PathPart());
+					if (fp.open(filename, "a")) {
+						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
+								  dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
+								  index,
+								  img->avg,
+								  img->sd,
+								  img->diff,
+								  img->level,
+								  threshold,
+								  logthreshold);
+						fp.close();
+					}
+				}
 			}
 		}
 	}
@@ -572,12 +614,12 @@ void ImageDiffer::SaveImage(IMAGE *img)
 		};
 
 		// save detection image, if possible
-		if (detimgdir.Valid() && img->detimage.Valid()) {
+		if (detimgdir.Valid() && detimgfmt.Valid() && img->detimage.Valid()) {
 			AString filename = detimgdir.CatPath(dt.DateFormat(detimgfmt) + ".jpg");
 			CreateDirectory(filename.PathPart());
 			img->detimage.SaveJPEG(filename, tags);
 		}
-
+		
 		// save main image
 		AString filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
 		CreateDirectory(filename.PathPart());
@@ -591,18 +633,37 @@ void ImageDiffer::SaveImage(IMAGE *img)
 
 void *ImageDiffer::Run()
 {
+	uint64_t dt = (uint64_t)ADateTime();
+
+	if (delay) {
+		dt += delay - 1;
+		dt -= dt % delay;
+	}
+	
 	while (!quitthread) {
+		uint64_t newdt = (uint64_t)ADateTime();
+		uint64_t diff  = SUBZ(dt, newdt);
+
+		if (diff) Sleep((uint32_t)diff);
+		
+		if (cmd.Valid()) Process(dt);
+
+		dt += delay;
+		
 		CheckSettingsUpdate();
 
-		if (cmd.Valid()) {
-			uint32_t tick  = GetTickCount();
-			Process();
-			uint32_t ticks = GetTickCount() - tick;
-			uint32_t diff  = SUBZ(delay, ticks);
-			
-			Sleep(diff | 1);
+		uint_t newsettingscount = settingschangecount;
+		if (newsettingscount != settingschange) {
+			settingschange = newsettingscount;
+			Log("Re-configuring");
+			Configure();
+
+			dt = (uint64_t)ADateTime();
+			if (delay) {
+				dt += delay - 1;
+				dt -= dt % delay;
+			}
 		}
-		else Sleep(500);
 	}
 
 	return NULL;
