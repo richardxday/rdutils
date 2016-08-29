@@ -100,6 +100,7 @@ protected:
 	AString					nodetcmd;
 	AString					detstartcmd;
 	AString					detendcmd;
+	AImage					maskimage;
 	AImage					gainimage;
 	std::vector<float>		gaindata;
 	double    			  	diffavg;
