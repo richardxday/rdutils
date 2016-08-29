@@ -198,17 +198,32 @@ void ImageDiffer::Configure()
 	
 	detcount = 0;
 
-	gainimage.Delete();
-	AString gainfilename = GetSetting("gainimage");
-	if (gainfilename.Valid()) {
-		if (gainimage.Load(gainfilename)) {
-			Log("Loaded gain image '%s'", gainfilename.str());   
+	{
+		AString filename;
+	
+		maskimage.Delete();
+		filename = GetSetting("maskimage");
+		if (filename.Valid()) {
+			if (maskimage.Load(filename)) {
+				Log("Loaded mask image '%s'", filename.str());   
+			}
+			else {
+				Log("Failed to load mask image '%s'", filename.str());   
+			}
 		}
-		else {
-			Log("Failed to load gain image '%s'", gainfilename.str());   
+	
+		gainimage.Delete();
+		filename = GetSetting("gainimage");
+		if (filename.Valid()) {
+			if (gainimage.Load(filename)) {
+				Log("Loaded gain image '%s'", filename.str());   
+			}
+			else {
+				Log("Failed to load gain image '%s'", filename.str());   
+			}
 		}
+		gaindata.resize(0);
 	}
-	gaindata.resize(0);
 	
 	predetectionimages  = (uint_t)GetSetting("predetectionimages",  "2");
 	postdetectionimages = (uint_t)GetSetting("postdetectionimages", "2");
@@ -280,6 +295,9 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *
 		AImage& image = img->image;
 
 		if (ReadJPEGInfo(filename, info) && image.LoadJPEG(filename)) {
+			// apply mask immediately
+			image *= maskimage;
+			
 			img->filename = filename;
 			img->rect     = image.GetRect();
 			img->saved    = false;
