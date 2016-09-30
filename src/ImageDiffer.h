@@ -16,6 +16,8 @@ public:
 	ImageDiffer(uint_t _index);
 	~ImageDiffer();
 
+	void Compare(const char *file1, const char *file2, const char *outfile);
+	
 	static AString GetGlobalSetting(const AString& name, const AString& defval = "");
 
 	static void Delete(uptr_t item, void *context) {
@@ -43,9 +45,13 @@ protected:
 		delete (IMAGE *)item;
 	}
 
-	IMAGE *CreateImage(const char *filename, const IMAGE *img0);
+	IMAGE *CreateImage(const char *filename, const IMAGE *img0 = NULL);
 	void SaveImage(IMAGE *img);
 
+	void FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<float>& difference);
+	void CalcLevel(IMAGE *img2, double avg, double sd, std::vector<float>& difference);
+	void CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<float>& difference);
+	
 	AString GetSetting(const AString& name, const AString& defval = "");
 	void CheckSettingsUpdate();
 
