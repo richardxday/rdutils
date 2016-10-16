@@ -51,7 +51,8 @@ protected:
 	void FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<float>& difference);
 	void CalcLevel(IMAGE *img2, double avg, double sd, std::vector<float>& difference);
 	void CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<float>& difference);
-	
+
+	bool SettingExists(const AString& name);
 	AString GetSetting(const AString& name, const AString& defval = "");
 	void CheckSettingsUpdate();
 
@@ -60,6 +61,8 @@ protected:
 	
 	void Configure();
 
+	AString CreateWGetCommand(const AString& url);
+	AString CreateCaptureCommand();
 	void Process(const ADateTime& dt);
 
 	virtual void *Run();
