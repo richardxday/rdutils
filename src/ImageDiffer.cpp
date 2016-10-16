@@ -70,14 +70,38 @@ ImageDiffer::ProtectedSettings& ImageDiffer::GetSettings()
 	return _settings;
 }
 
+bool ImageDiffer::SettingExists(const AString& name)
+{
+	ProtectedSettings& _settings = GetSettings();
+	AThreadLock		   lock(_settings);
+	ASettingsHandler&  settings = _settings.GetSettings();
+	AString			   suffix   = AString(":%").Arg(index);
+	return (settings.Exists(name + suffix) || settings.Exists(name));
+}
+
 AString ImageDiffer::GetSetting(const AString& name, const AString& defval)
 {
 	ProtectedSettings& _settings = GetSettings();
 	AThreadLock		   lock(_settings);
 	ASettingsHandler&  settings = _settings.GetSettings();
 	AString			   suffix   = AString(":%").Arg(index);
+	AString			   str      = settings.Get(name + suffix, settings.Get(name, defval));
+	int p = 0, p1, p2;
+
+	while (((p1 = str.Pos("{", p)) >= 0) && ((p2 = str.Pos("}", p1 + 1)) >= 0)) {
+		AString str1 = str.Left(p1);
+		AString str2 = str.Mid(p1 + 1, p2 - p1 - 1);
+		AString str3 = str.Mid(p2 + 1);
+
+		if (SettingExists(str2)) {
+			str  = str1 + GetSetting(str2);
+			p    = str.len();
+			str += str3;
+		}
+		else p = p2 + 1;
+	}
 	
-	return settings.Get(name + suffix, settings.Get(name, defval));
+	return str;
 }
 
 void ImageDiffer::CheckSettingsUpdate()
@@ -127,6 +151,33 @@ void ImageDiffer::SetStat(const AString& name, double val)
 	AString			   suffix = AString(":%").Arg(index);
 	
 	stats.Set(name + suffix, AString("%0.16e").Arg(val));
+}
+
+AString ImageDiffer::CreateWGetCommand(const AString& url)
+{
+	AString cmd;
+
+	cmd.printf("wget %s \"%s\" 2>/dev/null", wgetargs.str(), url.str());
+
+	return cmd;
+}
+
+AString ImageDiffer::CreateCaptureCommand()
+{
+	AString cmd;
+	
+	if (cameraurl.Valid()) {
+		cmd.printf("%s -O %s", CreateWGetCommand(cameraurl).str(), tempfile.str());
+	}
+	else if (videosrc.Valid()) {
+		cmd.printf("streamer -c /dev/%s %s 2>/dev/null -o %s", videosrc.str(), streamerargs.str(), tempfile.str());
+	}
+	else if (capturecmd.Valid()) {
+		cmd.printf("%s 2>/dev/null", capturecmd.SearchAndReplace("{file}", tempfile).str());
+	}
+	else Log("No valid capture command!");
+
+	return cmd;
 }
 
 void ImageDiffer::Configure()
@@ -179,18 +230,8 @@ void ImageDiffer::Configure()
 	Log("Destination '%s'", imagedir.CatPath(imagefmt).str());
 	if (detimgdir.Valid()) Log("Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
 	if (detlogfmt.Valid()) Log("Detection log '%s' with threshold %0.1lf", imagedir.CatPath(detlogfmt).str(), logthreshold);
-	
-	cmd.Delete();
-	if (cameraurl.Valid()) {
-		cmd.printf("wget %s \"%s\" -O %s 2>/dev/null", wgetargs.str(), cameraurl.str(), tempfile.str());
-	}
-	else if (videosrc.Valid()) {
-		cmd.printf("streamer -c /dev/%s %s -o %s 2>/dev/null", videosrc.str(), streamerargs.str(), tempfile.str());
-	}
-	else if (capturecmd.Valid()) {
-		cmd.printf("%s 2>/dev/null", capturecmd.SearchAndReplace("{file}", tempfile).str());
-	}
-	else Log("No valid capture command!");
+
+	cmd = CreateCaptureCommand();
 
 	Log("Capture command '%s'", cmd.str());
 	
@@ -282,6 +323,21 @@ void ImageDiffer::Configure()
 #endif
 	}
 	else matrix.resize(0);
+
+	if (cameraurl.Valid()) {
+		AString str;
+		uint_t i;
+
+		for (i = 1; (str = AString("camerapreurl[%]").Arg(i)).Valid() && SettingExists(str); i++) {
+			AString cmd;
+
+			cmd.printf("%s -O /dev/null", CreateWGetCommand(GetSetting(str)).str());
+
+			if (system(cmd) == 0) {
+				Log("Ran '%s' successfully", cmd.str());
+			}
+		}
+	}
 }
 
 ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *img0)
@@ -665,10 +721,19 @@ void ImageDiffer::SaveImage(IMAGE *img)
 		}
 		
 		// save main image
+		FILE_INFO info;
 		AString filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
-		CreateDirectory(filename.PathPart());
+		AString dir      = filename.PathPart();
+		if (!GetFileInfo(dir, &info) && !CreateDirectory(dir)) {
+			Log("Failed to create directory '%s'", dir.str());
+			fprintf(stderr, "Failed to create directory '%s'\n", dir.str());
+		}
+		
 		Log("Saving detection image in '%s'", filename.str());
-		img->image.SaveJPEG(filename, tags);
+		if (!img->image.SaveJPEG(filename, tags)) {
+			Log("Failed to save detection image in '%s'", filename.str());
+			fprintf(stderr, "Failed to save detection image in '%s'\n", filename.str());
+		}
 
 		// mark as saved
 		img->saved = true;
