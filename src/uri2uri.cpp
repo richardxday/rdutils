@@ -6,6 +6,8 @@
 #include <rdlib/SocketServer.h>
 #include <rdlib/QuitHandler.h>
 
+#include "uri2uri_private.h"
+
 AQuitHandler QuitHandler;
 
 int main(int argc, char *argv[])
@@ -39,6 +41,7 @@ int main(int argc, char *argv[])
 	}
 
 	if ((arg + 2) > argc) {
+		fprintf(stderr, "uri2uri " VER_STRING "\n");
 		fprintf(stderr, "Usage: uri2uri [<options>] <uri1> <uri2>\n");
 		fprintf(stderr, "Where <options> are:\n");
 		fprintf(stderr, "\t-q\t\t\tDo not output traffic stats\n");
