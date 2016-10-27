@@ -7,6 +7,8 @@
 #include <rdlib/Recurse.h>
 #include <rdlib/QuitHandler.h>
 
+#include "list_private.h"
+
 /* end of includes */
 
 typedef struct {
@@ -378,6 +380,7 @@ int main(int argc, char *argv[])
 	int i;
 
 	if (argc < 2) {
+		fprintf(stderr, "list " VER_STRING "\n");
 		fprintf(stderr, "Usage: list [<options>] <file-spec> {[<options>] [<file-spec>] ...}\n");
 		fprintf(stderr, "\t-r\t\t\tRecurse sub-directories\n");
 		//fprintf(stderr, "\t-r+\t\t\tRecurse sub-directories\n");

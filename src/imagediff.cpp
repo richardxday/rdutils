@@ -10,25 +10,33 @@
 #include <rdlib/strsup.h>
 #include <rdlib/QuitHandler.h>
 
+#include "imagediff_private.h"
+
 #include "ImageDiffer.h"
 
 AQuitHandler quithandler;
 
 volatile bool hupdetected = false;
+
+#ifdef __LINUX__
 static void detecthup(int sig)
 {
 	hupdetected |= (sig == SIGHUP);
 }
+#endif
 
 int main(int argc, char *argv[])
 {
 	int  i;
 	bool run = true;
 	
+#ifdef __LINUX__
 	signal(SIGHUP, &detecthup);
-
+#endif
+	
 	for (i = 1; i < argc; i++) {
 		if ((stricmp(argv[i], "-help") == 0) || (stricmp(argv[i], "-h") == 0)) {
+			fprintf(stderr, "imagediff " VER_STRING "\n");
 			printf("Usage: imagediff [<options>]\n");
 			printf("Where <options> is one or more of:\n");
 			printf("  -h or -help\t\thelp text (this)\n");

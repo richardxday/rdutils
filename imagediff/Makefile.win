@@ -1,0 +1,36 @@
+# Project: imagediff
+# Makefile created by Dev-C++ 4.9.9.2
+
+CPP  = g++.exe
+CC   = gcc.exe
+WINDRES = windres.exe -IC:\MinGW\msys\1.0\local\include\wx-2.8
+RES  = objs/imagediff_private.res
+OBJ  = objs/imagediff.o objs/ImageDiffer.o $(RES)
+LINKOBJ  = objs/imagediff.o objs/ImageDiffer.o $(RES)
+LIBS =  -L"c:/mingw/lib" -L"c:/mingw/msys/1.0/local/lib" ../../rdlib/winlib/winlib.a -lwsock32 -ljpeg -lpthread  -s 
+INCS =  -I"c:/MinGW/include"  -I"C:/MinGW/msys/1.0/local/include"  -I"."  -I"../../rdlib/include" 
+CXXINCS =  -I"c:/MinGW/include"  -I"C:/MinGW/msys/1.0/local/include"  -I"C:/MinGW/msys/1.0/local/include/wx-2.8"  -I"C:/MinGW/msys/1.0/local/lib/wx/include/msw-unicode-release-static-2.8"  -I"."  -I"../../rdlib/include" 
+BIN  = imagediff.exe
+CXXFLAGS = $(CXXINCS)   -Wall -D_WIN32 -D_WIN32_IE=0x700 -O3
+CFLAGS = $(INCS)   -Wall -D_WIN32 -D_WIN32_IE=0x700 -O3
+RM = rm -f
+
+.PHONY: all all-before all-after clean clean-custom
+
+all: all-before imagediff.exe all-after
+
+
+clean: clean-custom
+	${RM} $(OBJ) $(BIN)
+
+$(BIN): $(OBJ)
+	$(CPP) $(LINKOBJ) -o "imagediff.exe" $(LIBS)
+
+objs/imagediff.o: ../src/imagediff.cpp ../../rdlib/include/rdlib/strsup.h  ../../rdlib/include/rdlib/ListNode.h ../../rdlib/include/rdlib/misc.h  ../../rdlib/include/rdlib/types.h ../../rdlib/include/rdlib/NodeType.h  ../../rdlib/include/rdlib/StdData.h  ../../rdlib/include/rdlib/EvalNumber.h  ../../rdlib/include/rdlib/QuitHandler.h imagediff_private.h  ../src/ImageDiffer.h ../../rdlib/include/rdlib/DataList.h  ../../rdlib/include/rdlib/DateTime.h ../../rdlib/include/rdlib/strsup.h  ../../rdlib/include/rdlib/DataList.h  ../../rdlib/include/rdlib/SettingsHandler.h  ../../rdlib/include/rdlib/StdFile.h ../../rdlib/include/rdlib/Hash.h  ../../rdlib/include/rdlib/DateTime.h  ../../rdlib/include/rdlib/BMPImage.h  ../../rdlib/include/rdlib/PointSizeRect.h  ../../rdlib/include/rdlib/tag.h ../../rdlib/include/rdlib/3DTrans.h  ../../rdlib/include/rdlib/Matrix.h ../../rdlib/include/rdlib/Thread.h  ../../rdlib/include/rdlib/ThreadLock.h  ../../rdlib/include/rdlib/ThreadLock.h
+	$(CPP) -c ../src/imagediff.cpp -o objs/imagediff.o $(CXXFLAGS)
+
+objs/ImageDiffer.o: ../src/ImageDiffer.cpp ../../rdlib/include/rdlib/Recurse.h  ../../rdlib/include/rdlib/misc.h ../../rdlib/include/rdlib/types.h  ../../rdlib/include/rdlib/strsup.h ../../rdlib/include/rdlib/ListNode.h  ../../rdlib/include/rdlib/NodeType.h ../../rdlib/include/rdlib/StdData.h  ../../rdlib/include/rdlib/EvalNumber.h  ../../rdlib/include/rdlib/DataList.h  ../../rdlib/include/rdlib/DateTime.h  ../../rdlib/include/rdlib/QuitHandler.h  ../../rdlib/include/rdlib/jpeginfo.h ../src/ImageDiffer.h  ../../rdlib/include/rdlib/strsup.h ../../rdlib/include/rdlib/DataList.h  ../../rdlib/include/rdlib/DateTime.h  ../../rdlib/include/rdlib/SettingsHandler.h  ../../rdlib/include/rdlib/StdFile.h ../../rdlib/include/rdlib/Hash.h  ../../rdlib/include/rdlib/BMPImage.h  ../../rdlib/include/rdlib/PointSizeRect.h  ../../rdlib/include/rdlib/tag.h ../../rdlib/include/rdlib/3DTrans.h  ../../rdlib/include/rdlib/Matrix.h ../../rdlib/include/rdlib/Thread.h  ../../rdlib/include/rdlib/ThreadLock.h  ../../rdlib/include/rdlib/ThreadLock.h
+	$(CPP) -c ../src/ImageDiffer.cpp -o objs/ImageDiffer.o $(CXXFLAGS)
+
+objs/imagediff_private.res: imagediff_private.rc 
+	$(WINDRES) -i imagediff_private.rc --input-format=rc -o objs/imagediff_private.res -O coff 

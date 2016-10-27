@@ -5,12 +5,15 @@
 
 #include <rdlib/StdSocket.h>
 
+#include "cmdsender_private.h"
+
 int main(int argc, char *argv[])
 {
 	ASocketServer server;
 	AStdSocket    socket(server);
 
 	if (argc < 2) {
+		fprintf(stderr, "cmdsender " VER_STRING "\n");
 		fprintf(stderr, "Usage: cmdsender <host> [<port>]\n");
 		exit(1);
 	}

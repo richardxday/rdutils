@@ -8,6 +8,8 @@
 #include <rdlib/Regex.h>
 #include <rdlib/QuitHandler.h>
 
+#include "agrep_private.h"
+
 /* end of includes */
 
 AQuitHandler QuitHandler;
@@ -318,7 +320,8 @@ int main(int argc, char *argv[])
 	bSubDirs                	    = true;
 
 	if (argc < 3) {
-		fprintf(stderr, "agrep [<options>] <pattern> <files...>|-\n");
+		fprintf(stderr, "agrep " VER_STRING "\n");
+		fprintf(stderr, "Usage: agrep [<options>] <pattern> <files...>|-\n");
 		fprintf(stderr, "Options (enabled by '+', disabled by '-'):\n");
 		fprintf(stderr, "\t-d\t\tRecurse sub-directories (default: %s)\n", bSubDirs ? "On" : "Off");
 		fprintf(stderr, "\t-r\t\tPattern is regex (default: %s)\n", Context.RegEx ? "On" : "Off");

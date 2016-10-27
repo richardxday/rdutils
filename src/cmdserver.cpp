@@ -7,6 +7,8 @@
 #include <rdlib/SettingsHandler.h>
 #include <rdlib/StdSocket.h>
 
+#include "cmdserver_private.h"
+
 AQuitHandler quithandler;
 
 int main(int argc, char *argv[])
