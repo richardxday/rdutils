@@ -22,7 +22,7 @@ typedef struct {
 	AString   address;
 
 	double    xpos, ypos;
-	double    distance;
+	double    distance, totaldistance;
 	uint64_t  timediff;
 	uint_t    journey;
 
@@ -37,7 +37,8 @@ bool compare(const RECORD& rec1, const RECORD& rec2)
 
 int main(int argc, char *argv[])
 {
-	static const double pi180 = M_PI / 180.0;
+	static const double pi180		= M_PI / 180.0;
+	static const double EarthRadius = 6371.0e3;
 	AStdFile fp;
 	AList    files;
 	AString  datfilename;
@@ -138,8 +139,8 @@ int main(int argc, char *argv[])
 
 				if (nitems == 6) {
 					if ((record.lat != 0.0) || (record.lng != 0.0)) {
-						record.xpos	= 6400.0 * sin(record.lng * pi180) * cos(record.lat * pi180);
-						record.ypos	= 6400.0 * sin(record.lat * pi180);
+						record.xpos	= EarthRadius * sin(record.lng * pi180) * cos(record.lat * pi180);
+						record.ypos	= EarthRadius * sin(record.lat * pi180);
 						
 						records.push_back(record);
 					}
@@ -157,19 +158,35 @@ int main(int argc, char *argv[])
 	std::sort(records.begin(), records.end(), compare);
 
 	if (records.size() > 1) {
+		double totaldistance = 0.0;
 		size_t i;
 		uint_t journey = 0;
-		
+	
 		for (i = 1; i < records.size(); i++) {
 			const RECORD& lastrecord = records[i  -1];
 			RECORD& record 			 = records[i];
-			
-			record.distance = sqrt((record.xpos - lastrecord.xpos) * (record.xpos - lastrecord.xpos) + (record.ypos - lastrecord.ypos) * (record.ypos - lastrecord.ypos));
+			double  lat1			 = lastrecord.lat * pi180;
+			double  lng1			 = lastrecord.lng * pi180;
+			double  lat2			 = record.lat * pi180;
+			double  lng2			 = record.lng * pi180;
+			double  latdiff          = (lat2 - lat1);
+			double  lngdiff          = (lng2 - lng1);
+			double  a = sin(latdiff * .5) * sin(latdiff * .5) + cos(lat1) * cos(lat2) * sin(lngdiff * .5) * sin(lngdiff * .5);
+			double  c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+
+			record.distance = EarthRadius * c / 1604.0;
 			record.timediff = (uint64_t)(record.dt - lastrecord.dt);
 
-			if ((record.timediff >= 120000) || (record.distance >= 4.0)) journey++;
+			totaldistance  += record.distance;
 
-			record.journey = journey;
+			if ((record.timediff >= 120000) || (record.distance >= 4.0)) {
+				debug("Journey %u distance %0.1lf miles\n", journey + 1, lastrecord.totaldistance);
+				totaldistance = 0.0;
+				journey++;
+			}
+
+			record.journey       = journey;
+			record.totaldistance = totaldistance;
 		}
 	}
 	
@@ -188,9 +205,9 @@ int main(int argc, char *argv[])
 				fp.printf("\n\n");
 			}
 
-			fp.printf("%0.14le %0.14le %u %u %0.14le %0.14le %0.14lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
+			fp.printf("%0.14le %0.14le %u %u %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
 					  record.lat, record.lng, record.speed, record.journey,
-					  record.xpos, record.ypos, record.distance,
+					  record.xpos, record.ypos, record.distance, record.totaldistance,
 					  (double)record.timediff * .001,
 					  (double)((uint64_t)record.dt - (uint64_t)journeytime) * .001,
 					  (double)((uint64_t)record.dt - (uint64_t)starttime) * .001,
@@ -241,7 +258,7 @@ int main(int argc, char *argv[])
 				
 				fp.printf("    <Placemark>\n");
 				fp.printf("      <name>Journey %u: start %s</name>\n", record.journey + 1, record.dt.DateToStr().str());
-				fp.printf("      <description></description>\n");
+				fp.printf("      <description>Start at %s</description>\n", record.address.str());
 				fp.printf("      <Point>\n");
 				fp.printf("        <coordinates>\n");
 				fp.printf("          %0.14le,%0.14le,%u\n", record.lng, record.lat, record.speed);
@@ -251,7 +268,7 @@ int main(int argc, char *argv[])
 
 				fp.printf("    <Placemark>\n");
 				fp.printf("      <name>Journey %u: end %s</name>\n", endrecord.journey + 1, endrecord.dt.DateToStr().str());
-				fp.printf("      <description></description>\n");
+				fp.printf("      <description>End at %s</description>\n", endrecord.address.str());
 				fp.printf("      <Point>\n");
 				fp.printf("        <coordinates>\n");
 				fp.printf("          %0.14le,%0.14le,%u\n", endrecord.lng, endrecord.lat, endrecord.speed);
@@ -261,7 +278,7 @@ int main(int argc, char *argv[])
 
 				fp.printf("    <Placemark>\n");
 				fp.printf("      <name>Journey %u: %s - %s</name>\n", record.journey + 1, record.dt.DateToStr().str(), endrecord.dt.DateToStr().str());
-				fp.printf("      <description></description>\n");
+				fp.printf("      <description>Total %0.3lf miles</description>\n", endrecord.totaldistance);
 				fp.printf("      <styleUrl>#tracklines</styleUrl>\n");
 				fp.printf("      <LineString>\n");
 				fp.printf("        <extrude>1</extrude>\n");
