@@ -38,4 +38,9 @@ LOCAL_CFLAGS += -I$(APPLICATION)
 OBJECTS      := $(APPLICATION:%=%.o) ImageDiffer.o
 include $(MAKEFILEDIR)/makefile.app
 
+APPLICATION  := srttracker
+LOCAL_CFLAGS += -I$(APPLICATION)
+OBJECTS      := $(APPLICATION:%=%.o)
+include $(MAKEFILEDIR)/makefile.app
+
 include $(MAKEFILEDIR)/makefile.post
