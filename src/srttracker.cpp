@@ -77,20 +77,20 @@ int main(int argc, char *argv[])
 			uint_t  month, day, year;
 			uint_t  ival, hrs1, mins1, secs1, ms1, hrs2, mins2, secs2, ms2;
 			bool    timeset = false;
-			
+
 			if (sscanf(file->FilePart(), "%u_%u_%u_%u_%u_%u", &month, &day, &year, &hrs1, &mins1, &secs1) == 6) {
 				dt.Set(day, month, year + 2000, hrs1, mins1, secs1);
 			}
 			record.distance = 0.0;
 			record.timediff = 0;
 			record.journey  = 0;
-			
+
 			while (line.ReadLn(fp) >= 0) {
 				double fval1, fval2;
 				AString word1 = line.Word(0).ToLower();
 
 				ln++;
-				
+
 				if (line.Empty()) {
 					nitems = 0;
 				}
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 				else if (word1 == "time:") {
 					AString   timestr = line.Word(4) + line.Word(5).SearchAndReplace(".", "") + " " + line.Word(2).SearchAndReplace(",", "") + "-" + line.Word(1) + "-" + line.Word(3);
 					ADateTime dt2;
-					
+
 					dt2.StrToDate(timestr, ADateTime::Time_Absolute);
 					if (!timeset) {
 						if (dt2.GetHours() > dt.GetHours()) {
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
 					}
 
 					if (dt2 > dt) dt = dt2;
-					
+
 					record.dt  = dt;
 					uint64_t diff = std::max(record.end - record.start, 1000UL);
 					dt        += diff;
@@ -156,10 +156,10 @@ int main(int argc, char *argv[])
 					if ((record.lat != 0.0) || (record.lng != 0.0)) {
 						record.xpos	= EarthRadius * sin(record.lng * pi180) * cos(record.lat * pi180);
 						record.ypos	= EarthRadius * sin(record.lat * pi180);
-						
+
 						records.push_back(record);
 					}
-					
+
 					nitems = 0;
 				}
 			}
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
 		double totaldistance = 0.0;
 		size_t i;
 		uint_t journey = 0;
-	
+
 		for (i = 1; i < records.size(); i++) {
 			const RECORD& lastrecord = records[i  -1];
 			RECORD& record 			 = records[i];
@@ -194,6 +194,8 @@ int main(int argc, char *argv[])
 
 			totaldistance  += record.distance;
 
+			//debug("Record %u timediff %lu distance %0.3lf\n", (uint32_t)i, record.timediff, record.distance);
+			
 			if ((record.timediff >= 120000) || (record.distance >= 4.0)) {
 				debug("Journey %u distance %0.1lf miles\n", journey + 1, lastrecord.totaldistance);
 				totaldistance = 0.0;
@@ -202,15 +204,19 @@ int main(int argc, char *argv[])
 
 			record.journey       = journey;
 			record.totaldistance = totaldistance;
+
+			if (i == (records.size() - 1)) {
+				debug("Journey %u distance %0.1lf miles\n", journey + 1, record.totaldistance);
+			}
 		}
 	}
-	
+
 	if (records.size() && datfilename.Valid() && fp.open(datfilename, "w")) {
 		const ADateTime& starttime   = records[0].dt;
 		ADateTime        journeytime = starttime;
 		size_t i;
 		uint_t journey = 0;
-		
+
 		for (i = 0; i < records.size(); i++) {
 			const RECORD& record = records[i];
 
@@ -240,12 +246,12 @@ int main(int argc, char *argv[])
 		size_t i, j;
 		uint_t journey = 0;
 		uint_t week = 0;
-		
+
 		bool started = false;
 		for (i = 0; i < records.size(); i++) {
 			const RECORD& record = records[i];
-			
-			if (started && (record.journey != journey)) {				
+
+			if (started && (record.journey != journey)) {
 				fp.printf("        </coordinates>\n");
 				fp.printf("      </LineString>\n");
 				fp.printf("    </Placemark>\n");
@@ -258,7 +264,7 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			if (!started) {				
+			if (!started) {
 				if (!fp.isopen() && fp.open(kmlfilename.Prefix() + AString("-%04").Arg(GetWeekNumber(record.dt)) + "." + kmlfilename.Suffix(), "w")) {
 					fp.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 					fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
@@ -310,11 +316,11 @@ int main(int argc, char *argv[])
 				fp.printf("        <tessellate>1</tessellate>\n");
 				fp.printf("        <altitudeMode>relativeToGround</altitudeMode>\n");
 				fp.printf("        <coordinates>\n");
-				
+
 				started = true;
 				journey = record.journey;
 			}
-				
+
 			fp.printf("            %0.14le,%0.14le,%u\n", record.lng, record.lat, record.speed);
 		}
 
@@ -325,12 +331,12 @@ int main(int argc, char *argv[])
 				fp.printf("    </Placemark>\n");
 				started = false;
 			}
-		
+
 			fp.printf("  </Document>\n");
 			fp.printf("</kml>\n");
 			fp.close();
 		}
 	}
-	
+
 	return 0;
 }
