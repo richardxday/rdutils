@@ -35,6 +35,21 @@ bool compare(const RECORD& rec1, const RECORD& rec2)
 	return (rec1.dt < rec2.dt);
 }
 
+uint32_t GetWeekNumber(const ADateTime& dt)
+{
+	static ADateTime firstdt = ADateTime::MinDateTime;
+	static bool      inited  = false;
+
+	if (!inited) {
+		firstdt = dt;
+		if (firstdt.GetWeekDay() != 0) firstdt.PrevWeekDay(0);
+
+		inited = true;
+	}
+
+	return (dt - firstdt).GetDays() / 7;
+}
+
 int main(int argc, char *argv[])
 {
 	static const double pi180		= M_PI / 180.0;
@@ -221,37 +236,47 @@ int main(int argc, char *argv[])
 		fp.close();
 	}
 
-	if (records.size() && kmlfilename.Valid() && fp.open(kmlfilename, "w")) {
+	if (records.size() && kmlfilename.Valid()) {
 		size_t i, j;
 		uint_t journey = 0;
-
-		fp.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-		fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
-		fp.printf("  <Document>\n");
-		fp.printf("    <name>SRT Tracks</name>\n");
-		fp.printf("    <description>SRT Tracks</description>\n");
-		fp.printf("    <Style id=\"tracklines\">\n");
-		fp.printf("      <LineStyle>\n");
-		fp.printf("        <color>7fff00ff</color>\n");
-		fp.printf("        <width>2</width>\n");
-		fp.printf("      </LineStyle>\n");
-		fp.printf("      <PolyStyle>\n");
-		fp.printf("        <color>7fff0000</color>\n");
-		fp.printf("      </PolyStyle>\n");
-		fp.printf("    </Style>\n");
-
+		uint_t week = 0;
+		
 		bool started = false;
 		for (i = 0; i < records.size(); i++) {
 			const RECORD& record = records[i];
-
-			if (started && (record.journey != journey)) {
+			
+			if (started && (record.journey != journey)) {				
 				fp.printf("        </coordinates>\n");
 				fp.printf("      </LineString>\n");
 				fp.printf("    </Placemark>\n");
 				started = false;
+
+				if (GetWeekNumber(record.dt) != week) {
+					fp.printf("  </Document>\n");
+					fp.printf("</kml>\n");
+					fp.close();
+				}
 			}
 
-			if (!started) {
+			if (!started) {				
+				if (!fp.isopen() && fp.open(kmlfilename.Prefix() + AString("-%04").Arg(GetWeekNumber(record.dt)) + "." + kmlfilename.Suffix(), "w")) {
+					fp.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+					fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
+					fp.printf("  <Document>\n");
+					fp.printf("    <name>SRT Tracks</name>\n");
+					fp.printf("    <description>SRT Tracks</description>\n");
+					fp.printf("    <Style id=\"tracklines\">\n");
+					fp.printf("      <LineStyle>\n");
+					fp.printf("        <color>7fff00ff</color>\n");
+					fp.printf("        <width>2</width>\n");
+					fp.printf("      </LineStyle>\n");
+					fp.printf("      <PolyStyle>\n");
+					fp.printf("        <color>7fff0000</color>\n");
+					fp.printf("      </PolyStyle>\n");
+					fp.printf("    </Style>\n");
+					week = GetWeekNumber(record.dt);
+				}
+
 				for (j = i + 1; (j < records.size()) && (records[j].journey == records[i].journey); j++) ;
 
 				const RECORD& endrecord = records[j - 1];
@@ -293,15 +318,18 @@ int main(int argc, char *argv[])
 			fp.printf("            %0.14le,%0.14le,%u\n", record.lng, record.lat, record.speed);
 		}
 
-		if (started) {
-			fp.printf("        </coordinates>\n");
-			fp.printf("      </LineString>\n");
-			fp.printf("    </Placemark>\n");
-		}
+		if (fp.isopen()) {
+			if (started) {
+				fp.printf("        </coordinates>\n");
+				fp.printf("      </LineString>\n");
+				fp.printf("    </Placemark>\n");
+				started = false;
+			}
 		
-		fp.printf("  </Document>\n");
-		fp.printf("</kml>\n");
-		fp.close();
+			fp.printf("  </Document>\n");
+			fp.printf("</kml>\n");
+			fp.close();
+		}
 	}
 	
 	return 0;
