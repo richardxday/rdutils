@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 					if (dt2 > dt) dt = dt2;
 
 					record.dt  = dt;
-					uint64_t diff = std::max(record.end - record.start, 1000UL);
+					uint64_t diff = std::max(record.end - record.start, (uint64_t)1000);
 					dt        += diff;
 					nitems++;
 				}
