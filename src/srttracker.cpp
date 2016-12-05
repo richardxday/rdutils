@@ -42,7 +42,12 @@ uint32_t GetWeekNumber(const ADateTime& dt)
 
 	if (!inited) {
 		firstdt = dt;
-		if (firstdt.GetWeekDay() != 0) firstdt.PrevWeekDay(0);
+		if (firstdt.GetWeekDay() != 0) {
+			firstdt.PrevWeekDay(0);
+		}
+		firstdt.SetMS(0);
+
+		//debug("First day is %s\n", firstdt.DateToStr().str());
 
 		inited = true;
 	}
@@ -243,6 +248,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (records.size() && kmlfilename.Valid()) {
+		AString filename;
 		size_t i, j;
 		uint_t journey = 0;
 		uint_t week = 0;
@@ -265,27 +271,35 @@ int main(int argc, char *argv[])
 			}
 
 			if (!started) {
-				if (!fp.isopen() && fp.open(kmlfilename.Prefix() + AString("-%04").Arg(GetWeekNumber(record.dt)) + "." + kmlfilename.Suffix(), "w")) {
-					fp.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-					fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
-					fp.printf("  <Document>\n");
-					fp.printf("    <name>SRT Tracks</name>\n");
-					fp.printf("    <description>SRT Tracks</description>\n");
-					fp.printf("    <Style id=\"tracklines\">\n");
-					fp.printf("      <LineStyle>\n");
-					fp.printf("        <color>7fff00ff</color>\n");
-					fp.printf("        <width>2</width>\n");
-					fp.printf("      </LineStyle>\n");
-					fp.printf("      <PolyStyle>\n");
-					fp.printf("        <color>7fff0000</color>\n");
-					fp.printf("      </PolyStyle>\n");
-					fp.printf("    </Style>\n");
-					week = GetWeekNumber(record.dt);
+				if (!fp.isopen()) {
+					week     = GetWeekNumber(record.dt);
+					filename = kmlfilename.Prefix() + AString("-%04").Arg(week) + "." + kmlfilename.Suffix();
+				
+					if (fp.open(filename, "w")) {
+						debug("New file '%s'\n", filename.str());
+						
+						fp.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+						fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
+						fp.printf("  <Document>\n");
+						fp.printf("    <name>SRT Tracks</name>\n");
+						fp.printf("    <description>SRT Tracks</description>\n");
+						fp.printf("    <Style id=\"tracklines\">\n");
+						fp.printf("      <LineStyle>\n");
+						fp.printf("        <color>7fff00ff</color>\n");
+						fp.printf("        <width>2</width>\n");
+						fp.printf("      </LineStyle>\n");
+						fp.printf("      <PolyStyle>\n");
+						fp.printf("        <color>7fff0000</color>\n");
+						fp.printf("      </PolyStyle>\n");
+						fp.printf("    </Style>\n");
+					}
 				}
 
-				for (j = i + 1; (j < records.size()) && (records[j].journey == records[i].journey); j++) ;
+				for (j = i + 1; (j < records.size()) && (records[j].journey == record.journey); j++) ;
 
 				const RECORD& endrecord = records[j - 1];
+
+				//debug("Writing journey %u (starts %s)\n", record.journey + 1, record.dt.DateToStr().str());
 				
 				fp.printf("    <Placemark>\n");
 				fp.printf("      <name>Journey %u: start %s</name>\n", record.journey + 1, record.dt.DateToStr().str());
