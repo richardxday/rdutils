@@ -62,13 +62,15 @@ int main(int argc, char *argv[])
 	AStdFile fp;
 	AList    files;
 	AString  datfilename;
+	AString  kmldir      = "kml";
 	AString  kmlfilename = "journeys.kml";
 	std::vector<RECORD> records;
 	int i;
 
 	for (i = 1; i < argc; i++) {
-		if		(stricmp(argv[i], "-dat") == 0) datfilename = argv[++i];
-		else if (stricmp(argv[i], "-kml") == 0) kmlfilename = argv[++i];
+		if		(stricmp(argv[i], "-dat") 	 == 0) datfilename = argv[++i];
+		else if (stricmp(argv[i], "-kml") 	 == 0) kmlfilename = argv[++i];
+		else if (stricmp(argv[i], "-kmldir") == 0) kmldir      = argv[++i];
 		else CollectFiles(argv[i], "*.srt", 0, files);
 	}
 
@@ -248,7 +250,6 @@ int main(int argc, char *argv[])
 	}
 
 	if (records.size() && kmlfilename.Valid()) {
-		AString filename;
 		size_t i, j;
 		uint_t journey = 0;
 		uint_t week = 0;
@@ -272,9 +273,12 @@ int main(int argc, char *argv[])
 
 			if (!started) {
 				if (!fp.isopen()) {
+					AString filename;
+					
 					week     = GetWeekNumber(record.dt);
-					filename = kmlfilename.Prefix() + AString("-%04").Arg(week) + "." + kmlfilename.Suffix();
-				
+					filename = kmldir.CatPath(kmlfilename.Prefix() + AString("-%04").Arg(week) + "." + kmlfilename.Suffix());
+					CreateDirectory(filename.PathPart());
+					
 					if (fp.open(filename, "w")) {
 						debug("New file '%s'\n", filename.str());
 						
