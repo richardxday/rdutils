@@ -55,6 +55,82 @@ uint32_t GetWeekNumber(const ADateTime& dt)
 	return (dt - firstdt).GetDays() / 7;
 }
 
+void WriteHeader(AStdData& fp, const AString& name, const AString& description)
+{
+	fp.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+	fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
+	fp.printf("  <Document>\n");
+	fp.printf("    <name>%s</name>\n", name.str());
+	fp.printf("    <description>%s</description>\n", description.str());
+	fp.printf("    <Style id=\"tracklines\">\n");
+	fp.printf("      <LineStyle>\n");
+	fp.printf("        <color>7fff00ff</color>\n");
+	fp.printf("        <width>2</width>\n");
+	fp.printf("      </LineStyle>\n");
+	fp.printf("      <PolyStyle>\n");
+	fp.printf("        <color>7fff0000</color>\n");
+	fp.printf("      </PolyStyle>\n");
+	fp.printf("    </Style>\n");
+}
+
+size_t WriteJourney(AStdData& fp, const std::vector<RECORD>& records, size_t i)
+{
+	const RECORD& record    = records[i];
+	size_t j;
+	
+	for (j = i + 1; (j < records.size()) && (records[j].journey == record.journey); j++) ;
+
+	const RECORD& endrecord = records[j - 1];
+
+	//debug("Writing journey %u (starts %s)\n", record.journey + 1, record.dt.DateToStr().str());
+
+	fp.printf("    <Placemark>\n");
+	fp.printf("      <name>Journey %u: start %s</name>\n", record.journey + 1, record.dt.DateToStr().str());
+	fp.printf("      <description>Start at %s</description>\n", record.address.str());
+	fp.printf("      <Point>\n");
+	fp.printf("        <coordinates>\n");
+	fp.printf("          %0.14le,%0.14le,%u\n", record.lng, record.lat, record.speed);
+	fp.printf("        </coordinates>\n");
+	fp.printf("      </Point>\n");
+	fp.printf("    </Placemark>\n");
+
+	fp.printf("    <Placemark>\n");
+	fp.printf("      <name>Journey %u: end %s</name>\n", endrecord.journey + 1, endrecord.dt.DateToStr().str());
+	fp.printf("      <description>End at %s</description>\n", endrecord.address.str());
+	fp.printf("      <Point>\n");
+	fp.printf("        <coordinates>\n");
+	fp.printf("          %0.14le,%0.14le,%u\n", endrecord.lng, endrecord.lat, endrecord.speed);
+	fp.printf("        </coordinates>\n");
+	fp.printf("      </Point>\n");
+	fp.printf("    </Placemark>\n");
+
+	fp.printf("    <Placemark>\n");
+	fp.printf("      <name>Journey %u: %s - %s</name>\n", record.journey + 1, record.dt.DateToStr().str(), endrecord.dt.DateToStr().str());
+	fp.printf("      <description>Total %0.3lf miles</description>\n", endrecord.totaldistance);
+	fp.printf("      <styleUrl>#tracklines</styleUrl>\n");
+	fp.printf("      <LineString>\n");
+	fp.printf("        <extrude>1</extrude>\n");
+	fp.printf("        <tessellate>1</tessellate>\n");
+	fp.printf("        <altitudeMode>relativeToGround</altitudeMode>\n");
+	fp.printf("        <coordinates>\n");
+
+	for (j = i; (j < records.size()) && (records[j].journey == record.journey); j++) {
+		fp.printf("            %0.14le,%0.14le,%u\n", records[j].lng, records[j].lat, records[j].speed);
+	}
+
+	fp.printf("        </coordinates>\n");
+	fp.printf("      </LineString>\n");
+	fp.printf("    </Placemark>\n");
+
+	return j;
+}
+
+void WriteFooter(AStdData& fp)
+{
+	fp.printf("  </Document>\n");
+	fp.printf("</kml>\n");
+}
+
 int main(int argc, char *argv[])
 {
 	static const double pi180		= M_PI / 180.0;
@@ -62,15 +138,17 @@ int main(int argc, char *argv[])
 	AStdFile fp;
 	AList    files;
 	AString  datfilename;
-	AString  kmldir      = "kml";
-	AString  kmlfilename = "journeys.kml";
+	AString  kmldir          = "kml";
+	AString  weekfilename; //    = "week.kml";
+	AString  journeyfilename = "journey.kml";
 	std::vector<RECORD> records;
 	int i;
 
 	for (i = 1; i < argc; i++) {
-		if		(stricmp(argv[i], "-dat") 	 == 0) datfilename = argv[++i];
-		else if (stricmp(argv[i], "-kml") 	 == 0) kmlfilename = argv[++i];
-		else if (stricmp(argv[i], "-kmldir") == 0) kmldir      = argv[++i];
+		if		(stricmp(argv[i], "-dat") 	  == 0) datfilename 	= argv[++i];
+		else if (stricmp(argv[i], "-kmldir")  == 0) kmldir      	= argv[++i];
+		else if (stricmp(argv[i], "-week") 	  == 0) weekfilename    = argv[++i];
+		else if (stricmp(argv[i], "-journey") == 0) journeyfilename = argv[++i];
 		else CollectFiles(argv[i], "*.srt", 0, files);
 	}
 
@@ -249,110 +327,67 @@ int main(int argc, char *argv[])
 		fp.close();
 	}
 
-	if (records.size() && kmlfilename.Valid()) {
-		size_t i, j;
-		uint_t journey = 0;
+	if (records.size() && weekfilename.Valid()) {
+		size_t i;
 		uint_t week = 0;
 
-		bool started = false;
-		for (i = 0; i < records.size(); i++) {
+		for (i = 0; i < records.size(); ) {
 			const RECORD& record = records[i];
 
-			if (started && (record.journey != journey)) {
-				fp.printf("        </coordinates>\n");
-				fp.printf("      </LineString>\n");
-				fp.printf("    </Placemark>\n");
-				started = false;
-
-				if (GetWeekNumber(record.dt) != week) {
-					fp.printf("  </Document>\n");
-					fp.printf("</kml>\n");
-					fp.close();
-				}
+			if (fp.isopen() && (GetWeekNumber(record.dt) != week)) {
+				WriteFooter(fp);
+				fp.close();
 			}
 
-			if (!started) {
-				if (!fp.isopen()) {
-					AString filename;
-					
-					week     = GetWeekNumber(record.dt);
-					filename = kmldir.CatPath(kmlfilename.Prefix() + AString("-%04").Arg(week) + "." + kmlfilename.Suffix());
-					CreateDirectory(filename.PathPart());
-					
-					if (fp.open(filename, "w")) {
-						debug("New file '%s'\n", filename.str());
-						
-						fp.printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-						fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
-						fp.printf("  <Document>\n");
-						fp.printf("    <name>SRT Tracks</name>\n");
-						fp.printf("    <description>SRT Tracks</description>\n");
-						fp.printf("    <Style id=\"tracklines\">\n");
-						fp.printf("      <LineStyle>\n");
-						fp.printf("        <color>7fff00ff</color>\n");
-						fp.printf("        <width>2</width>\n");
-						fp.printf("      </LineStyle>\n");
-						fp.printf("      <PolyStyle>\n");
-						fp.printf("        <color>7fff0000</color>\n");
-						fp.printf("      </PolyStyle>\n");
-						fp.printf("    </Style>\n");
-					}
-				}
-
-				for (j = i + 1; (j < records.size()) && (records[j].journey == record.journey); j++) ;
-
-				const RECORD& endrecord = records[j - 1];
-
-				//debug("Writing journey %u (starts %s)\n", record.journey + 1, record.dt.DateToStr().str());
+			if (!fp.isopen()) {
+				AString filename;
 				
-				fp.printf("    <Placemark>\n");
-				fp.printf("      <name>Journey %u: start %s</name>\n", record.journey + 1, record.dt.DateToStr().str());
-				fp.printf("      <description>Start at %s</description>\n", record.address.str());
-				fp.printf("      <Point>\n");
-				fp.printf("        <coordinates>\n");
-				fp.printf("          %0.14le,%0.14le,%u\n", record.lng, record.lat, record.speed);
-				fp.printf("        </coordinates>\n");
-				fp.printf("      </Point>\n");
-				fp.printf("    </Placemark>\n");
-
-				fp.printf("    <Placemark>\n");
-				fp.printf("      <name>Journey %u: end %s</name>\n", endrecord.journey + 1, endrecord.dt.DateToStr().str());
-				fp.printf("      <description>End at %s</description>\n", endrecord.address.str());
-				fp.printf("      <Point>\n");
-				fp.printf("        <coordinates>\n");
-				fp.printf("          %0.14le,%0.14le,%u\n", endrecord.lng, endrecord.lat, endrecord.speed);
-				fp.printf("        </coordinates>\n");
-				fp.printf("      </Point>\n");
-				fp.printf("    </Placemark>\n");
-
-				fp.printf("    <Placemark>\n");
-				fp.printf("      <name>Journey %u: %s - %s</name>\n", record.journey + 1, record.dt.DateToStr().str(), endrecord.dt.DateToStr().str());
-				fp.printf("      <description>Total %0.3lf miles</description>\n", endrecord.totaldistance);
-				fp.printf("      <styleUrl>#tracklines</styleUrl>\n");
-				fp.printf("      <LineString>\n");
-				fp.printf("        <extrude>1</extrude>\n");
-				fp.printf("        <tessellate>1</tessellate>\n");
-				fp.printf("        <altitudeMode>relativeToGround</altitudeMode>\n");
-				fp.printf("        <coordinates>\n");
-
-				started = true;
-				journey = record.journey;
+				week     = GetWeekNumber(record.dt);
+				filename = kmldir.CatPath(weekfilename.Prefix() + AString("-%04").Arg(week) + "." + weekfilename.Suffix());
+				CreateDirectory(filename.PathPart());
+				
+				if (fp.open(filename, "w")) {
+					debug("New file '%s'\n", filename.str());
+					
+					WriteHeader(fp, AString("Week %").Arg(week), AString("Week %: %").Arg(week).Arg(record.dt.DateToStr()));
+				}
+				else {
+					fprintf(stderr, "Failed to open file '%s' for writing\n", filename.str());
+					break;
+				}
 			}
-
-			fp.printf("            %0.14le,%0.14le,%u\n", record.lng, record.lat, record.speed);
+			
+			i = WriteJourney(fp, records, i);
 		}
 
 		if (fp.isopen()) {
-			if (started) {
-				fp.printf("        </coordinates>\n");
-				fp.printf("      </LineString>\n");
-				fp.printf("    </Placemark>\n");
-				started = false;
-			}
-
-			fp.printf("  </Document>\n");
-			fp.printf("</kml>\n");
+			WriteFooter(fp);
 			fp.close();
+		}
+	}
+
+	if (records.size() && journeyfilename.Valid()) {
+		size_t i;
+
+		for (i = 0; i < records.size(); ) {
+			const RECORD& record = records[i];
+			AString filename;
+				
+			filename = kmldir.CatPath(journeyfilename.Prefix() + AString("-%04").Arg(record.journey + 1) + "." + journeyfilename.Suffix());
+			CreateDirectory(filename.PathPart());
+			
+			if (fp.open(filename, "w")) {
+				debug("New file '%s'\n", filename.str());
+					
+				WriteHeader(fp, AString("Journey %").Arg(record.journey + 1), AString("Journey %: %").Arg(record.journey + 1).Arg(record.dt.DateToStr()));
+				i = WriteJourney(fp, records, i);
+				WriteFooter(fp);
+				fp.close();
+			}
+			else {
+				fprintf(stderr, "Failed to open file '%s' for writing\n", filename.str());
+				break;
+			}
 		}
 	}
 
