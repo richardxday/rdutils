@@ -380,7 +380,6 @@ int main(int argc, char *argv[])
 		}
 
 		WriteRecords(kmldir, jrnfilename, datfilename, records);
-		MoveFiles(filenames, olddir);
 	}
 
 	return 0;
