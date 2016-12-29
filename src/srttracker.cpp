@@ -276,7 +276,10 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 
 			fp.printf("    <Placemark>\n");
 			fp.printf("      <name>Journey: %s - %s</name>\n", record1.dt.DateToStr().str(), record2.dt.DateToStr().str());
-			fp.printf("      <description>Total %0.3lf miles</description>\n", record2.totaldistance);
+			fp.printf("      <description>Total %0.3lf miles, %0.1lf hours, average speed %0.1lf mph</description>\n",
+					  record2.totaldistance,
+					  (double)(uint64_t)(record2.dt - record1.dt) / (3600.0 * 1000.0),
+					  (3600.0 * 1000.0 * (double)record2.totaldistance) / (double)(uint64_t)(record2.dt - record1.dt));
 			fp.printf("      <styleUrl>#tracklines</styleUrl>\n");
 			fp.printf("      <LineString>\n");
 			fp.printf("        <extrude>1</extrude>\n");
