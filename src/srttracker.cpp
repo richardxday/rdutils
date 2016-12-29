@@ -193,7 +193,8 @@ bool ReadFile(const AString& filename, RECORDFILE& file, std::vector<RECORD> *re
 void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AString& datfilename, std::vector<RECORD>& records)
 {
 	if (records.size() >= 2) {
-		AString  filename = kmldir.CatPath(jrnfilename.Prefix() + records[0].dt.DateFormat("-%Y-%M-%D-%h-%m-%s") + "." + jrnfilename.Suffix());
+		const ADateTime& dt = records[0].dt;
+		AString  filename = kmldir.CatPath(dt.DateFormat("%Y-%M-%N/%D-%l"), jrnfilename.Prefix() + dt.DateFormat("%h-%m-%s") + "." + jrnfilename.Suffix());
 		AStdFile fp;
 		size_t   i;
 
@@ -276,7 +277,8 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 		}
 
 		if (datfilename.Valid() && fp.open(datfilename, "a")) {
-			static uint64_t starttime = 0;
+			static uint64_t starttime   = 0;
+			static uint64_t overalltime = 0;
 			uint64_t journeytime = records[0].dt;
 			size_t i;
 
@@ -285,12 +287,14 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 			for (i = 0; i < records.size(); i++) {
 				const RECORD& record = records[i];
 
-				fp.printf("%0.14le %0.14le %u %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
+				overalltime += record.timediff;
+				fp.printf("%0.14le %0.14le %u %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
 						  record.lat, record.lng, record.speed,
 						  record.xpos, record.ypos, record.distance, record.totaldistance,
 						  (double)record.timediff * .001,
 						  (double)((uint64_t)record.dt - journeytime) * .001,
 						  (double)((uint64_t)record.dt - starttime) * .001,
+						  (double)overalltime * .001,
 						  record.dt.DateToStr().str(),
 						  record.address.str(),
 						  record.filename.FilePart().str(),
