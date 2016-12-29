@@ -18,12 +18,14 @@ typedef struct {
 	uint64_t  start, end;
 	double    lat, lng;
 	uint_t    speed;
+	double	  avgspeed;
 	ADateTime dt;
 	AString   address;
 
 	double    xpos, ypos;
 	double    distance, totaldistance;
 	uint64_t  timediff;
+	uint64_t  totaltime;
 
 	AString   filename;
 	uint_t    ln;
@@ -96,7 +98,7 @@ bool ReadFile(const AString& filename, RECORDFILE& file, std::vector<RECORD> *re
 			dt.Set(day, month, year + 2000, hrs1, mins1, secs1);
 		}
 		record.distance = record.totaldistance = 0.0;
-		record.timediff = 0;
+		record.timediff = record.totaltime     = 0;
 
 		while (line.ReadLn(fp) >= 0) {
 			double fval1, fval2;
@@ -193,10 +195,19 @@ bool ReadFile(const AString& filename, RECORDFILE& file, std::vector<RECORD> *re
 void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AString& datfilename, std::vector<RECORD>& records)
 {
 	if (records.size() >= 2) {
-		const ADateTime& dt = records[0].dt;
-		AString  filename = kmldir.CatPath(dt.DateFormat("%Y-%M-%N/%D-%l"), jrnfilename.Prefix() + dt.DateFormat("-%h-%m-%s") + "." + jrnfilename.Suffix());
+		const ADateTime&    dt = records[0].dt;
+		AString				filename = kmldir.CatPath(dt.DateFormat("%Y-%M-%N/%D-%l"), jrnfilename.Prefix() + dt.DateFormat("-%h-%m-%s") + "." + jrnfilename.Suffix());
+		std::vector<uint_t> speedarray(5);
 		AStdFile fp;
+		uint_t   speedsum = 0;
 		size_t   i;
+
+		memset(&speedarray[0], 0, speedarray.size() * sizeof(speedarray[0]));
+		
+		speedarray[0] = records[0].speed;
+		speedsum += speedarray[0];
+
+		records[0].avgspeed = (double)speedsum;
 
 		for (i = 1; i < records.size(); i++) {
 			const RECORD& rec1 = records[i - 1];
@@ -205,6 +216,13 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 			rec2.distance      = CalcDistance(rec1, rec2);
 			rec2.totaldistance = rec1.totaldistance + rec2.distance;
 			rec2.timediff      = (uint64_t)(rec2.dt - rec1.dt);
+			rec2.totaltime     = rec1.totaltime + rec2.timediff;
+			
+			speedsum -= speedarray[i % speedarray.size()];
+			speedarray[i % speedarray.size()] = rec2.speed;
+			speedsum += speedarray[i % speedarray.size()];
+
+			rec2.avgspeed = (double)speedsum / (double)speedarray.size();
 		}
 
 		CreateDirectory(filename.PathPart());
@@ -219,7 +237,13 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 			fp.printf("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n");
 			fp.printf("  <Document>\n");
 			fp.printf("    <name>Journey %s</name>\n", record1.dt.DateToStr().str());
-			fp.printf("    <description>Started %s at %s, ended %s at %s, total %0.1lf miles</description>\n", record1.dt.DateToStr().str(), record1.address.str(), record2.dt.DateToStr().str(), record2.address.str(), record2.totaldistance);
+			fp.printf("    <description>Started %s at %s, ended %s at %s, total %0.1lf miles, average speed %0.1lf mph</description>\n",
+					  record1.dt.DateToStr().str(),
+					  record1.address.str(),
+					  record2.dt.DateToStr().str(),
+					  record2.address.str(),
+					  record2.totaldistance,
+					  (3600.0 * 1000.0 * (double)record2.totaldistance) / (double)(uint64_t)(record2.dt - record1.dt));
 			fp.printf("    <Style id=\"tracklines\">\n");
 			fp.printf("      <LineStyle>\n");
 			fp.printf("        <color>7fff00ff</color>\n");
@@ -288,8 +312,8 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 				const RECORD& record = records[i];
 
 				overalltime += record.timediff;
-				fp.printf("%0.14le %0.14le %u %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
-						  record.lat, record.lng, record.speed,
+				fp.printf("%0.14le %0.14le %u %0.1lf %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
+						  record.lat, record.lng, record.speed, record.avgspeed,
 						  record.xpos, record.ypos, record.distance, record.totaldistance,
 						  (double)record.timediff * .001,
 						  (double)((uint64_t)record.dt - journeytime) * .001,
@@ -334,6 +358,7 @@ int main(int argc, char *argv[])
 	AString  kmldir      = "kml";
 	AString  olddir      = "old";
 	AString  jrnfilename = "journey.kml";
+	bool	 movefiles   = true;
 	int i;
 
 	for (i = 1; i < argc; i++) {
@@ -341,6 +366,7 @@ int main(int argc, char *argv[])
 		else if (stricmp(argv[i], "-kmldir")  == 0) kmldir      = argv[++i];
 		else if (stricmp(argv[i], "-olddir")  == 0) olddir      = argv[++i];
 		else if (stricmp(argv[i], "-journey") == 0) jrnfilename = argv[++i];
+		else if (stricmp(argv[i], "-leave")   == 0) movefiles   = false;
 		else CollectFiles(argv[i], "*.srt", 0, filelist);
 	}
 
@@ -377,7 +403,7 @@ int main(int argc, char *argv[])
 
 					if ((time >= 120000) || (dist >= 4.0)) {
 						WriteRecords(kmldir, jrnfilename, datfilename, records);
-						MoveFiles(filenames, olddir);
+						if (movefiles) MoveFiles(filenames, olddir);
 					}
 				}
 			}
