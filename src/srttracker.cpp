@@ -194,7 +194,7 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 {
 	if (records.size() >= 2) {
 		const ADateTime& dt = records[0].dt;
-		AString  filename = kmldir.CatPath(dt.DateFormat("%Y-%M-%N/%D-%l"), jrnfilename.Prefix() + dt.DateFormat("%h-%m-%s") + "." + jrnfilename.Suffix());
+		AString  filename = kmldir.CatPath(dt.DateFormat("%Y-%M-%N/%D-%l"), jrnfilename.Prefix() + dt.DateFormat("-%h-%m-%s") + "." + jrnfilename.Suffix());
 		AStdFile fp;
 		size_t   i;
 
