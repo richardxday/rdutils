@@ -192,38 +192,42 @@ bool ReadFile(const AString& filename, RECORDFILE& file, std::vector<RECORD> *re
 	return success;
 }
 
-void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AString& datfilename, std::vector<RECORD>& records)
+void ProcessRecords(std::vector<RECORD>& records)
+{
+	std::vector<uint_t> speedarray(5);
+	uint_t speedsum = 0;
+	size_t i;
+
+	memset(&speedarray[0], 0, speedarray.size() * sizeof(speedarray[0]));
+		
+	speedarray[0] = records[0].speed;
+	speedsum += speedarray[0];
+
+	records[0].avgspeed = (double)speedsum;
+
+	for (i = 1; i < records.size(); i++) {
+		const RECORD& rec1 = records[i - 1];
+		RECORD&       rec2 = records[i];
+
+		rec2.distance      = CalcDistance(rec1, rec2);
+		rec2.totaldistance = rec1.totaldistance + rec2.distance;
+		rec2.timediff      = (uint64_t)(rec2.dt - rec1.dt);
+		rec2.totaltime     = rec1.totaltime + rec2.timediff;
+			
+		speedsum -= speedarray[i % speedarray.size()];
+		speedarray[i % speedarray.size()] = rec2.speed;
+		speedsum += speedarray[i % speedarray.size()];
+
+		rec2.avgspeed = (double)speedsum / (double)speedarray.size();
+	}
+}
+
+void WriteRecords(const std::vector<RECORD>& records, const AString& kmldir, const AString& jrnfilename)
 {
 	if (records.size() >= 2) {
-		const ADateTime&    dt = records[0].dt;
-		AString				filename = kmldir.CatPath(dt.DateFormat("%Y-%M-%N/%D-%l"), jrnfilename.Prefix() + dt.DateFormat("-%h-%m-%s") + "." + jrnfilename.Suffix());
-		std::vector<uint_t> speedarray(5);
+		const ADateTime& dt = records[0].dt;
+		AString	 filename = kmldir.CatPath(dt.DateFormat("%Y-%M-%N/%D-%l"), jrnfilename.Prefix() + dt.DateFormat("-%h-%m-%s") + "." + jrnfilename.Suffix());
 		AStdFile fp;
-		uint_t   speedsum = 0;
-		size_t   i;
-
-		memset(&speedarray[0], 0, speedarray.size() * sizeof(speedarray[0]));
-		
-		speedarray[0] = records[0].speed;
-		speedsum += speedarray[0];
-
-		records[0].avgspeed = (double)speedsum;
-
-		for (i = 1; i < records.size(); i++) {
-			const RECORD& rec1 = records[i - 1];
-			RECORD&       rec2 = records[i];
-
-			rec2.distance      = CalcDistance(rec1, rec2);
-			rec2.totaldistance = rec1.totaldistance + rec2.distance;
-			rec2.timediff      = (uint64_t)(rec2.dt - rec1.dt);
-			rec2.totaltime     = rec1.totaltime + rec2.timediff;
-			
-			speedsum -= speedarray[i % speedarray.size()];
-			speedarray[i % speedarray.size()] = rec2.speed;
-			speedsum += speedarray[i % speedarray.size()];
-
-			rec2.avgspeed = (double)speedsum / (double)speedarray.size();
-		}
 
 		CreateDirectory(filename.PathPart());
 
@@ -290,6 +294,7 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 			fp.printf("        <altitudeMode>relativeToGround</altitudeMode>\n");
 			fp.printf("        <coordinates>\n");
 
+			size_t i;
 			for (i = 0; i < records.size(); i++) {
 				fp.printf("            %0.14le,%0.14le,%u\n", records[i].lng, records[i].lat, records[i].speed);
 			}
@@ -305,43 +310,46 @@ void WriteRecords(const AString& kmldir, const AString& jrnfilename, const AStri
 		else {
 			fprintf(stderr, "Failed to open file '%s' for writing\n", filename.str());
 		}
-
-		if (datfilename.Valid() && fp.open(datfilename, "a")) {
-			static uint64_t starttime   = 0;
-			static uint64_t overalltime = 0;
-			uint64_t journeytime = records[0].dt;
-			size_t i;
-
-			if (!starttime) starttime = journeytime;
-
-			for (i = 0; i < records.size(); i++) {
-				const RECORD& record = records[i];
-
-				overalltime += record.timediff;
-				fp.printf("%0.14le %0.14le %u %0.1lf %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
-						  record.lat, record.lng, record.speed, record.avgspeed,
-						  record.xpos, record.ypos, record.distance, record.totaldistance,
-						  (double)record.timediff * .001,
-						  (double)((uint64_t)record.dt - journeytime) * .001,
-						  (double)((uint64_t)record.dt - starttime) * .001,
-						  (double)overalltime * .001,
-						  record.dt.DateToStr().str(),
-						  record.address.str(),
-						  record.filename.FilePart().str(),
-						  record.ln,
-						  record.index);
-			}
-
-			fp.printf("\n\n");
-			
-			fp.close();
-		}
-		else if (datfilename.Valid()) {
-			fprintf(stderr, "Failed to open file '%s' for writing\n", datfilename.str());
-		}
 	}
+}
 
-	records.clear();
+void WriteDataFile(const std::vector<RECORD>& records, const AString& datfilename)
+{
+	AStdFile fp;
+	
+	if (datfilename.Valid() && fp.open(datfilename, "a")) {
+		static uint64_t starttime   = 0;
+		static uint64_t overalltime = 0;
+		uint64_t journeytime = records[0].dt;
+		size_t i;
+
+		if (!starttime) starttime = journeytime;
+
+		for (i = 0; i < records.size(); i++) {
+			const RECORD& record = records[i];
+
+			overalltime += record.timediff;
+			fp.printf("%0.14le %0.14le %u %0.1lf %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
+					  record.lat, record.lng, record.speed, record.avgspeed,
+					  record.xpos, record.ypos, record.distance, record.totaldistance,
+					  (double)record.timediff * .001,
+					  (double)((uint64_t)record.dt - journeytime) * .001,
+					  (double)((uint64_t)record.dt - starttime) * .001,
+					  (double)overalltime * .001,
+					  record.dt.DateToStr().str(),
+					  record.address.str(),
+					  record.filename.FilePart().str(),
+					  record.ln,
+					  record.index);
+		}
+
+		fp.printf("\n\n");
+			
+		fp.close();
+	}
+	else if (datfilename.Valid()) {
+		fprintf(stderr, "Failed to open file '%s' for writing\n", datfilename.str());
+	}
 }
 
 void MoveFiles(std::vector<AString>& filenames, const AString& olddir)
@@ -408,14 +416,22 @@ int main(int argc, char *argv[])
 					uint64_t time = (uint64_t)(rec2.dt - rec1.dt);
 
 					if ((time >= 120000) || (dist >= 4.0)) {
-						WriteRecords(kmldir, jrnfilename, datfilename, records);
-						if (movefiles) MoveFiles(filenames, olddir);
+						ProcessRecords(records);
+
+						WriteRecords(records, kmldir, jrnfilename);
+						WriteDataFile(records, datfilename);
+						
+						if (movefiles) MoveFiles(filenames, olddir.CatPath(records[0].dt.DateFormat("%Y/%M")));
+						records.clear();
 					}
 				}
 			}
 		}
 
-		WriteRecords(kmldir, jrnfilename, datfilename, records);
+		ProcessRecords(records);
+		
+		WriteRecords(records, kmldir, jrnfilename);
+		WriteDataFile(records, datfilename);
 	}
 
 	return 0;
