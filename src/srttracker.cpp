@@ -78,7 +78,7 @@ double CalcDistance(const RECORD& rec1, const RECORD& rec2)
 	return EarthRadius * c / 1604.0;
 }
 
-bool ReadFile(const AString& filename, RECORDFILE& file, std::vector<RECORD> *records = NULL)
+bool ReadFile(const AString& filename, RECORDFILE& file, const ADateTime& start, const ADateTime& end, std::vector<RECORD> *records = NULL)
 {
 	AStdFile fp;
 	bool success = false;
@@ -175,7 +175,7 @@ bool ReadFile(const AString& filename, RECORDFILE& file, std::vector<RECORD> *re
 					if (file.records.size() < 2) file.records.push_back(record);
 					else file.records[file.records.size() - 1] = record;
 
-					if (records) {
+					if (records && (record.dt >= start) && (record.dt <= end)) {
 						records->push_back(record);
 					}
 				}
@@ -329,18 +329,21 @@ void WriteDataFile(const std::vector<RECORD>& records, const AString& datfilenam
 			const RECORD& record = records[i];
 
 			overalltime += record.timediff;
-			fp.printf("%0.14le %0.14le %u %0.1lf %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
-					  record.lat, record.lng, record.speed, record.avgspeed,
-					  record.xpos, record.ypos, record.distance, record.totaldistance,
-					  (double)record.timediff * .001,
-					  (double)((uint64_t)record.dt - journeytime) * .001,
-					  (double)((uint64_t)record.dt - starttime) * .001,
-					  (double)overalltime * .001,
-					  record.dt.DateToStr().str(),
-					  record.address.str(),
-					  record.filename.FilePart().str(),
-					  record.ln,
-					  record.index);
+			fp.printf("%0.14le %0.14le %u %0.1lf %0.14le %0.14le %0.14le %0.14le %0.14lf %0.14lf %0.3lf %0.3lf %0.3lf %0.3lf '%s' '%s' '%s' %u %u\n",
+					  record.lat, record.lng, record.speed, record.avgspeed,			// 1, 2, 3, 4
+					  record.xpos, record.ypos,											// 5, 6
+					  record.xpos - records[0].xpos,									// 7
+					  record.ypos - records[0].ypos,									// 8
+					  record.distance, record.totaldistance,							// 9, 10
+					  (double)record.timediff * .001,									// 11
+					  (double)((uint64_t)record.dt - journeytime) * .001,				// 12
+					  (double)((uint64_t)record.dt - starttime) * .001,					// 13
+					  (double)overalltime * .001,										// 14
+					  record.dt.DateToStr().str(),										// 15
+					  record.address.str(),												// 16
+					  record.filename.FilePart().str(),									// 17
+					  record.ln,														// 18
+					  record.index);													// 19
 		}
 
 		fp.printf("\n\n");
@@ -352,7 +355,7 @@ void WriteDataFile(const std::vector<RECORD>& records, const AString& datfilenam
 	}
 }
 
-void MoveFiles(std::vector<AString>& filenames, const AString& olddir)
+void MoveFiles(const std::vector<AString>& filenames, const AString& olddir)
 {
 	size_t i;
 	
@@ -360,41 +363,69 @@ void MoveFiles(std::vector<AString>& filenames, const AString& olddir)
 	for (i = 0; i < filenames.size(); i++) {
 		rename(filenames[i], olddir.CatPath(filenames[i].FilePart()));
 	}
-						
-	filenames.clear();
 }
 
 int main(int argc, char *argv[])
 {
 	AStdFile fp;
 	AList    filelist;
-	AString  datfilename;
-	AString  kmldir      = "kml";
-	AString  olddir      = "old";
-	AString  jrnfilename = "journey.kml";
-	bool	 movefiles   = true;
+	ADateTime startdate   = ADateTime::MinDateTime;
+	ADateTime enddate     = ADateTime::MaxDateTime;
+	AString   datfilename = "journeys.dat";
+	AString   kmldir      = "kml";
+	AString   olddir      = "old";
+	AString   jrnfilename = "journey.kml";
+	bool	  writekml    = false;
+	bool      writedat    = false;
+	bool	  movefiles   = false;
+	bool	  verbose     = false;
+	uint_t    nsubdirs    = 0;
 	int i;
 
 	for (i = 1; i < argc; i++) {
-		if		(stricmp(argv[i], "-dat") 	  == 0) datfilename = argv[++i];
-		else if (stricmp(argv[i], "-kmldir")  == 0) kmldir      = argv[++i];
-		else if (stricmp(argv[i], "-olddir")  == 0) olddir      = argv[++i];
-		else if (stricmp(argv[i], "-journey") == 0) jrnfilename = argv[++i];
-		else if (stricmp(argv[i], "-leave")   == 0) movefiles   = false;
-		else CollectFiles(argv[i], "*.srt", 0, filelist);
+		if		(stricmp(argv[i], "--dat") 	   	== 0) datfilename = argv[++i];
+		else if (stricmp(argv[i], "--kmldir")  	== 0) kmldir      = argv[++i];
+		else if (stricmp(argv[i], "--olddir")  	== 0) olddir      = argv[++i];
+		else if (stricmp(argv[i], "--journey") 	== 0) jrnfilename = argv[++i];
+		else if (stricmp(argv[i], "--start") 	== 0) startdate.StrToDate(argv[++i]);
+		else if (stricmp(argv[i], "--end") 	    == 0) enddate.StrToDate(argv[++i]);
+		else if (stricmp(argv[i], "--archive") 	== 0) movefiles   = true;
+		else if (stricmp(argv[i], "--writekml") == 0) writekml    = true;
+		else if (stricmp(argv[i], "--writedat") == 0) writedat    = true;
+		else if (stricmp(argv[i], "--all")      == 0) nsubdirs    = RECURSE_ALL_SUBDIRS;
+		else if (stricmp(argv[i], "--verbose")  == 0) verbose     = true;
+		else {
+			uint_t nfiles = filelist.Count();
+			CollectFiles(argv[i], "*.srt", nsubdirs, filelist);
+			printf("Collected %u files from '%s'\n", filelist.Count() - nfiles, argv[i]);
+		}
 	}
+
+	printf("Parsing files..."); fflush(stdout);
 
 	std::vector<RECORDFILE> files;
-	const AString *file = AString::Cast(filelist.First());
-	while (file) {
-		RECORDFILE _file;
+	{
+		const AString *file;
+		uint_t fn, pc = ~0;
 
-		if (ReadFile(*file, _file, NULL)) {
-			files.push_back(_file);
+		for (file = AString::Cast(filelist.First()), fn = 0; file; file = file->Next(), fn++) {
+			RECORDFILE _file;
+
+			if (ReadFile(*file, _file, startdate, enddate)) {
+				files.push_back(_file);
+			}
+
+			if (verbose) {
+				uint_t pc1 = ((fn + 1) * 100) / filelist.Count();
+				if (pc1 != pc) {
+					pc = pc1;
+					printf("\rParsing files... %u%%", pc); fflush(stdout);
+				}
+			}
 		}
-
-		file = file->Next();
 	}
+	
+	printf("\nSorting files...\n");
 
 	std::sort(files.begin(), files.end(), compare);
 
@@ -405,33 +436,48 @@ int main(int argc, char *argv[])
 
 		if (datfilename.Valid()) remove(datfilename);
 
+		printf("Reading files...\n");
+
 		for (fn = 0; fn < files.size(); fn++) {
-			if (ReadFile(files[fn].filename, files[fn], &records)) {
+			if (ReadFile(files[fn].filename, files[fn], startdate, enddate, &records)) {
 				filenames.push_back(files[fn].filename);
 				
-				if (fn < (files.size() - 1)) {
-					const RECORD& rec1 = files[fn    ].records[files[fn].records.size() - 1];
+				if ((fn < (files.size() - 1)) && (records.size() > 0) && (files[fn].records.size() >= 2)) {
+					const size_t  last = files[fn].records.size() - 1;
+					const RECORD& rec1 = files[fn].records[last];
 					const RECORD& rec2 = files[fn + 1].records[0];
 					double   dist = CalcDistance(rec1, rec2);
 					uint64_t time = (uint64_t)(rec2.dt - rec1.dt);
 
 					if ((time >= 120000) || (dist >= 4.0)) {
+						if (verbose) {
+							printf("\rGenerating new journey (%3u files, %5u records), %u%% done", (uint_t)filenames.size(), (uint_t)records.size(), (uint_t)(((fn + 1) * 100) / files.size()));
+							fflush(stdout);
+						}
+						else printf("Generating new journey (%3u files, %5u records), %u%% done\n", (uint_t)filenames.size(), (uint_t)records.size(), (uint_t)(((fn + 1) * 100) / files.size()));
+						
 						ProcessRecords(records);
 
-						WriteRecords(records, kmldir, jrnfilename);
-						WriteDataFile(records, datfilename);
-						
+						if (writekml)  WriteRecords(records, kmldir, jrnfilename);
+						if (writedat)  WriteDataFile(records, datfilename);
 						if (movefiles) MoveFiles(filenames, olddir.CatPath(records[0].dt.DateFormat("%Y/%M")));
+						
 						records.clear();
+						filenames.clear();
 					}
 				}
 			}
 		}
 
+		if (verbose) {
+			printf("\rGenerating new journey (%3u files, %5u records), %u%% done\n", (uint_t)filenames.size(), (uint_t)records.size(), (uint_t)(((fn + 1) * 100) / files.size()));
+			fflush(stdout);
+		}
+		
 		ProcessRecords(records);
 		
-		WriteRecords(records, kmldir, jrnfilename);
-		WriteDataFile(records, datfilename);
+		if (writekml) WriteRecords(records, kmldir, jrnfilename);
+		if (writedat) WriteDataFile(records, datfilename);
 	}
 
 	return 0;
