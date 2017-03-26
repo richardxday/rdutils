@@ -194,31 +194,33 @@ bool ReadFile(const AString& filename, RECORDFILE& file, const ADateTime& start,
 
 void ProcessRecords(std::vector<RECORD>& records)
 {
-	std::vector<uint_t> speedarray(5);
-	uint_t speedsum = 0;
-	size_t i;
+	if (records.size() > 0) {
+		std::vector<uint_t> speedarray(5);
+		uint_t speedsum = 0;
+		size_t i;
+	
+		memset(&speedarray[0], 0, speedarray.size() * sizeof(speedarray[0]));
 
-	memset(&speedarray[0], 0, speedarray.size() * sizeof(speedarray[0]));
-		
-	speedarray[0] = records[0].speed;
-	speedsum += speedarray[0];
+		speedarray[0] = records[0].speed;
+		speedsum += speedarray[0];
 
-	records[0].avgspeed = (double)speedsum;
+		records[0].avgspeed = (double)speedsum;
 
-	for (i = 1; i < records.size(); i++) {
-		const RECORD& rec1 = records[i - 1];
-		RECORD&       rec2 = records[i];
+		for (i = 1; i < records.size(); i++) {
+			const RECORD& rec1 = records[i - 1];
+			RECORD&       rec2 = records[i];
 
-		rec2.distance      = CalcDistance(rec1, rec2);
-		rec2.totaldistance = rec1.totaldistance + rec2.distance;
-		rec2.timediff      = (uint64_t)(rec2.dt - rec1.dt);
-		rec2.totaltime     = rec1.totaltime + rec2.timediff;
+			rec2.distance      = CalcDistance(rec1, rec2);
+			rec2.totaldistance = rec1.totaldistance + rec2.distance;
+			rec2.timediff      = (uint64_t)(rec2.dt - rec1.dt);
+			rec2.totaltime     = rec1.totaltime + rec2.timediff;
 			
-		speedsum -= speedarray[i % speedarray.size()];
-		speedarray[i % speedarray.size()] = rec2.speed;
-		speedsum += speedarray[i % speedarray.size()];
+			speedsum -= speedarray[i % speedarray.size()];
+			speedarray[i % speedarray.size()] = rec2.speed;
+			speedsum += speedarray[i % speedarray.size()];
 
-		rec2.avgspeed = (double)speedsum / (double)speedarray.size();
+			rec2.avgspeed = (double)speedsum / (double)speedarray.size();
+		}
 	}
 }
 
