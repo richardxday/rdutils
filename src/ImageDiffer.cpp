@@ -324,6 +324,9 @@ void ImageDiffer::Configure()
 	}
 	else matrix.resize(0);
 
+	previouslevels.resize(10);
+	previouslevelindex = 0;
+	
 	if (cameraurl.Valid()) {
 		AString str;
 		uint_t i;
@@ -612,6 +615,9 @@ void ImageDiffer::Process(const ADateTime& dt)
 				const double& level = img2->level;
 				SetStat("level", level);
 
+				previouslevels[previouslevelindex] = level;
+				if ((++previouslevelindex) == previouslevels.size()) previouslevelindex = 0;
+				
 				if (detimgdir.Valid()) CreateDetectionImage(img1, img2, difference);
 
 				// should image(s) be saved?

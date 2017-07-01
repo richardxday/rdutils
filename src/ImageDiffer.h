@@ -124,6 +124,8 @@ protected:
 	double    			  	logthreshold;
 	std::vector<float>		matrix;
 	float     			  	matmul;
+	std::vector<double>		previouslevels;
+	size_t					previouslevelindex;
 	uint_t					predetectionimages;
 	uint_t					postdetectionimages;
 	uint_t					forcesavecount;
