@@ -56,6 +56,10 @@ void ImageDiffer::Log(uint_t index, const char *fmt, va_list ap)
 	str.printf("%s[%u]: ", dt.DateFormat("%Y-%M-%D %h:%m:%s").str(), index);
 	str.vprintf(fmt, ap);
 
+	if (verbose2 > 1) {
+		printf("%s\n", str.str());
+	}
+	
 	AThreadLock lock(loglock);
 	CreateDirectory(filename.PathPart());
 	if (fp.open(filename, "a")) {
@@ -226,6 +230,7 @@ void ImageDiffer::Configure()
 	threshold 	 = (double)GetSetting("threshold", 	  "3000.0");
 	logthreshold = (double)GetSetting("logthreshold", "{threshold}").SearchAndReplace("{threshold}", GetSetting("threshold", "3000.0"));
 	verbose   	 = (uint_t)GetSetting("verbose",      "0");
+	verbose2  	 = (uint_t)GetSetting("verbose2",     "0");
 
 	Log("Destination '%s'", imagedir.CatPath(imagefmt).str());
 	if (detimgdir.Valid()) Log("Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
@@ -610,9 +615,26 @@ void ImageDiffer::Process(const ADateTime& dt)
 
 				CalcLevel(img2, diffavg, diffsd, difference);
 
-				if (verbose) Log("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)", img2->level, img2->avg, img2->sd, diffavg, diffsd, img2->diff);
-
 				const double& level = img2->level;
+				if (verbose) {
+					Log("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)",
+						level,
+						img2->avg,
+						img2->sd,
+						diffavg,
+						diffsd,
+						img2->diff);
+				}
+				else if (verbose2) {
+					printf("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)\n",
+						   level,
+						   img2->avg,
+						   img2->sd,
+						   diffavg,
+						   diffsd,
+						   img2->diff);
+				}
+				
 				SetStat("level", level);
 
 				previouslevels[previouslevelindex] = level;

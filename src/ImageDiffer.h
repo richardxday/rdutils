@@ -133,6 +133,7 @@ protected:
 	uint_t    			  	matwid, mathgt;
 	uint_t					settingschange;
 	uint_t				    verbose;
+	uint_t					verbose2;
 	
 	static uint_t			settingschangecount;
 };
