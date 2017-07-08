@@ -723,11 +723,13 @@ void ImageDiffer::Process(const ADateTime& dt)
 
 					CreateDirectory(filename.PathPart());
 					if (fp.open(filename, "a")) {
-						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
+						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
 								  dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
 								  index,
 								  img->avg,
 								  img->sd,
+								  diffavg,
+								  diffsd,
 								  img->diff,
 								  img->level,
 								  img->rawlevel,
