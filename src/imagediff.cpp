@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 			}
 		}
 	
-		while (!quithandler.HasQuit() && !hupdetected) {
+		while (!quithandler.HasQuit() && !hupdetected && (ImageDiffer::DiffersRunning() > 0)) {
 			Sleep(100);
 		}
 

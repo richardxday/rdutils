@@ -25,6 +25,8 @@ public:
 		delete (ImageDiffer *)item;
 	}
 
+	static uint_t DiffersRunning() {return differsrunning;}
+	
 protected:
 	typedef struct {
 		AString	  filename;
@@ -36,6 +38,7 @@ protected:
 		double    sd;
 		double	  diff;
 		double	  level;
+		double	  rawlevel;
 		bool	  saved;
 	} IMAGE;
 
@@ -111,6 +114,8 @@ protected:
 	AString					detendcmd;
 	AImage					maskimage;
 	AImage					gainimage;
+	AList					sourceimagelist;
+	bool				    readingfromimagelist;
 	std::vector<float>		gaindata;
 	double    			  	diffavg;
 	double    			  	diffsd;
@@ -120,10 +125,10 @@ protected:
 	double    			  	redscale;
 	double    			  	grnscale;
 	double    			  	bluscale;
+	double					diffgain;
 	double    			  	threshold;
 	double    			  	logthreshold;
 	std::vector<float>		matrix;
-	float     			  	matmul;
 	std::vector<double>		previouslevels;
 	size_t					previouslevelindex;
 	uint_t					predetectionimages;
@@ -134,8 +139,10 @@ protected:
 	uint_t					settingschange;
 	uint_t				    verbose;
 	uint_t					verbose2;
+	uint_t					timeout;
 	
 	static uint_t			settingschangecount;
+	static uint_t			differsrunning;
 };
 
 #endif

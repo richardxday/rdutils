@@ -11,7 +11,8 @@
 
 #include "ImageDiffer.h"
 
-uint_t	ImageDiffer::settingschangecount = 0;
+uint_t ImageDiffer::settingschangecount = 0;
+uint_t ImageDiffer::differsrunning = 0;
 
 ImageDiffer::ImageDiffer(uint_t _index) :
 	AThread(),
@@ -20,13 +21,15 @@ ImageDiffer::ImageDiffer(uint_t _index) :
 	verbose(0)
 {
 	imglist.SetDestructor(&__DeleteImage);
-	
+
 	diffavg = GetStat("avg");
 	diffsd  = GetStat("sd");
 
 	Configure();
 
 	Log("New differ");
+
+	differsrunning++;
 }
 
 ImageDiffer::~ImageDiffer()
@@ -52,19 +55,21 @@ void ImageDiffer::Log(uint_t index, const char *fmt, va_list ap)
 	AString   str;
 	AString   filename = logpath.CatPath(AString("imagediff-%;.txt").Arg(dt.DateFormat("%Y-%M-%D").str()));
 	AStdFile  fp;
-	
+
 	str.printf("%s[%u]: ", dt.DateFormat("%Y-%M-%D %h:%m:%s").str(), index);
 	str.vprintf(fmt, ap);
 
-	if (verbose2 > 1) {
-		printf("%s\n", str.str());
+	if (verbose > 0) {
+		AThreadLock lock(loglock);
+		CreateDirectory(filename.PathPart());
+		if (fp.open(filename, "a")) {
+			fp.printf("%s\n", str.str());
+			fp.close();
+		}
 	}
-	
-	AThreadLock lock(loglock);
-	CreateDirectory(filename.PathPart());
-	if (fp.open(filename, "a")) {
-		fp.printf("%s\n", str.str());
-		fp.close();
+
+	if (verbose2 > 0) {
+		printf("%s\n", str.str());
 	}
 }
 
@@ -104,7 +109,7 @@ AString ImageDiffer::GetSetting(const AString& name, const AString& defval)
 		}
 		else p = p2 + 1;
 	}
-	
+
 	return str;
 }
 
@@ -153,7 +158,7 @@ void ImageDiffer::SetStat(const AString& name, double val)
 	AThreadLock		   lock(_stats);
 	ASettingsHandler&  stats  = _stats.GetSettings();
 	AString			   suffix = AString(":%").Arg(index);
-	
+
 	stats.Set(name + suffix, AString("%0.16e").Arg(val));
 }
 
@@ -161,7 +166,7 @@ AString ImageDiffer::CreateWGetCommand(const AString& url)
 {
 	AString cmd;
 
-	cmd.printf("wget %s \"%s\" 2>/dev/null", wgetargs.str(), url.str());
+	cmd.printf("timeout %u wget %s \"%s\" 2>/dev/null", timeout, wgetargs.str(), url.str());
 
 	return cmd;
 }
@@ -169,7 +174,7 @@ AString ImageDiffer::CreateWGetCommand(const AString& url)
 AString ImageDiffer::CreateCaptureCommand()
 {
 	AString cmd;
-	
+
 	if (cameraurl.Valid()) {
 		cmd.printf("%s -O %s", CreateWGetCommand(cameraurl).str(), tempfile.str());
 	}
@@ -187,6 +192,10 @@ AString ImageDiffer::CreateCaptureCommand()
 void ImageDiffer::Configure()
 {
 	AString indexstr = AString("%").Arg(index);
+	verbose   	 = (uint_t)GetSetting("verbose",      "0");
+	verbose2  	 = (uint_t)GetSetting("verbose2",     "0");
+	timeout      = (uint_t)GetSetting("timeout",	  "20");
+
 	logpath      = GetSetting("loglocation", "/var/log/imagediff");
 	name         = GetSetting("name");
 	delay        = (uint_t)(1000.0 * (double)GetSetting("delay", "1"));
@@ -221,16 +230,27 @@ void ImageDiffer::Configure()
 	detstartcmd  = GetSetting("detstartcommand").SearchAndReplace("{index}", indexstr);
 	detendcmd    = GetSetting("detendcommand").SearchAndReplace("{index}", indexstr);
 	nodetcmd  	 = GetSetting("nodetcommand").SearchAndReplace("{index}", indexstr);
+
+	sourceimagelist.DeleteAll();
+	AString imgdir = GetSetting("imagesourcedir");
+	if (imgdir.Valid()) {
+		extern AQuitHandler quithandler;
+
+		Log("Finding files in '%s'...", imgdir.str());
+		CollectFiles(imgdir, "*.jpg", RECURSE_ALL_SUBDIRS, sourceimagelist, FILE_FLAG_IS_DIR, 0, &quithandler);
+		Log("Found %u files in '%s'", sourceimagelist.Count(), imgdir.str());
+	}
+	readingfromimagelist = (sourceimagelist.Count() > 0);
+
 	coeff  	  	 = (double)GetSetting("coeff", 	   	  "1.0e-3");
 	avgfactor 	 = (double)GetSetting("avgfactor", 	  "1.0");
 	sdfactor  	 = (double)GetSetting("sdfactor",  	  "2.0");
 	redscale  	 = (double)GetSetting("rscale",    	  "1.0");
 	grnscale  	 = (double)GetSetting("gscale",    	  "1.0");
 	bluscale  	 = (double)GetSetting("bscale",    	  "1.0");
+	diffgain     = (double)GetSetting("diffmul",	  "1.0") / (double)GetSetting("diffdiv", "1.0");
 	threshold 	 = (double)GetSetting("threshold", 	  "3000.0");
 	logthreshold = (double)GetSetting("logthreshold", "{threshold}").SearchAndReplace("{threshold}", GetSetting("threshold", "3000.0"));
-	verbose   	 = (uint_t)GetSetting("verbose",      "0");
-	verbose2  	 = (uint_t)GetSetting("verbose2",     "0");
 
 	Log("Destination '%s'", imagedir.CatPath(imagefmt).str());
 	if (detimgdir.Valid()) Log("Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
@@ -239,66 +259,46 @@ void ImageDiffer::Configure()
 	cmd = CreateCaptureCommand();
 
 	Log("Capture command '%s'", cmd.str());
-	
+
 	detcount = 0;
 
 	{
 		AString filename;
-	
+
 		maskimage.Delete();
 		filename = GetSetting("maskimage");
 		if (filename.Valid()) {
 			if (maskimage.Load(filename)) {
-				Log("Loaded mask image '%s'", filename.str());   
+				Log("Loaded mask image '%s'", filename.str());
 			}
 			else {
-				Log("Failed to load mask image '%s'", filename.str());   
+				Log("Failed to load mask image '%s'", filename.str());
 			}
 		}
-	
+
 		gainimage.Delete();
 		filename = GetSetting("gainimage");
 		if (filename.Valid()) {
 			if (gainimage.Load(filename)) {
-				Log("Loaded gain image '%s'", filename.str());   
+				Log("Loaded gain image '%s'", filename.str());
 			}
 			else {
-				Log("Failed to load gain image '%s'", filename.str());   
+				Log("Failed to load gain image '%s'", filename.str());
 			}
 		}
 		gaindata.resize(0);
 	}
-	
+
 	predetectionimages  = (uint_t)GetSetting("predetectionimages",  "2");
 	postdetectionimages = (uint_t)GetSetting("postdetectionimages", "2");
 	forcesavecount      = 0;
-	
-	matmul = 1.f;
+
 	matwid = mathgt = 0;
-	
+
 	AString _matrix = GetSetting("matrix");
 	if (_matrix.Valid()) {
 		uint_t row, nrows = _matrix.CountLines(";");
 		uint_t col, ncols = 1;
-		int    p;
-
-		if ((p = _matrix.Pos("*")) >= 0) {
-			AString mul = _matrix.Mid(p + 1);
-				
-			_matrix = _matrix.Left(p);
-
-			if ((p = mul.Pos("/")) >= 0) {
-				matmul = (float)mul.Left(p) / (float)mul.Mid(p + 1);
-			}
-			else matmul = (float)mul;
-		}
-		else if ((p = _matrix.Pos("/")) >= 0) {
-			AString mul = _matrix.Mid(p + 1);
-				
-			_matrix = _matrix.Left(p);
-
-			matmul = 1.f / (float)mul;
-		}
 
 		for (row = 0; row < nrows; row++) {
 			uint_t n = _matrix.Line(row, ";").CountLines(",");
@@ -311,7 +311,7 @@ void ImageDiffer::Configure()
 		matrix.resize(nrows * ncols);
 		for (row = 0; row < nrows; row++) {
 			AString line = _matrix.Line(row,";");
-				
+
 			for (col = 0; col < ncols; col++) matrix[col + row * ncols] = (float)line.Line(col, ",");
 		}
 
@@ -324,15 +324,14 @@ void ImageDiffer::Configure()
 			for (col = 0; col < ncols; col++) debug("%8.3f", matrix[col + row * ncols]);
 			debug("\n");
 		}
-		debug("Multiplier %0.6f\n", matmul);
 #endif
 	}
 	else matrix.resize(0);
 
 	previouslevels.resize(10);
 	previouslevelindex = 0;
-	
-	if (cameraurl.Valid()) {
+
+	if (!readingfromimagelist && cameraurl.Valid()) {
 		AString str;
 		uint_t i;
 
@@ -359,7 +358,7 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *
 		if (ReadJPEGInfo(filename, info) && image.LoadJPEG(filename)) {
 			// apply mask immediately
 			image *= maskimage;
-			
+
 			img->filename = filename;
 			img->rect     = image.GetRect();
 			img->saved    = false;
@@ -391,19 +390,18 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 	const ARect& rect = img1->rect;
 	const uint_t w = rect.w, h = rect.h, len = w * h;
 	std::vector<float> data;
-	float *ptr, *p;
+	float  *p;
 	double avg[3];
 	uint_t x, y;
 
 	difference.resize(len);
 	data.resize(len * 3);
-	ptr = &data[0];
 
 	memset(avg, 0, sizeof(avg));
 
 	// find difference between the two images and
 	// normalize against average on each line per component
-	for (y = 0, p = ptr; y < h; y++) {
+	for (y = 0, p = &data[0]; y < h; y++) {
 		double yavg[3];
 
 		// reset average
@@ -451,7 +449,7 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 			static const AImage::PIXEL white = {255, 255, 255, 0};
 			const AImage::PIXEL *gainptr = gainimage.GetPixelData() ? gainimage.GetPixelData() : &white;
 			float sum = 0.f;
-								
+
 			gaindata.resize(n);
 
 			for (y = 0; y < h; y++) {
@@ -471,7 +469,7 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 				}
 			}
 
-			// scale all gain data up so it sums to w * h * 3 
+			// scale all gain data up so it sums to w * h * 3
 			if (sum > 0.f) {
 				sum = (float)n / sum;
 
@@ -483,7 +481,7 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 	// subtract overall average from pixel data, scale by gain image and
 	// calculate modulus
 	float *p2, *p3;
-	for (y = 0, p = ptr, p2 = ptr, p3 = &gaindata[0]; y < h; y++) {
+	for (y = 0, p = &data[0], p2 = &data[0], p3 = &gaindata[0]; y < h; y++) {
 		for (x = 0; x < w; x++, p += 3, p2++, p3 += 3) {
 			p[0] -= avg[0];
 			p[1] -= avg[1];
@@ -508,19 +506,19 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 					if (((y + my) >= cy) && ((y + my) < (h + cy))) {
 						for (mx = 0; mx < matwid; mx++) {
 							if (((x + mx) >= cx) && ((x + mx) < (w + cx))) {
-								val += matrix[mx + my * matwid] * ptr[(x + mx - cx) + (y + my - cy) * w];
+								val += matrix[mx + my * matwid] * data[(x + mx - cx) + (y + my - cy) * w];
 							}
 							//else debug("x: ((%u + %u) >= %u) && ((%u + %u) < (%u + %u)) failed\n", x, mx, cx, x, mx, w, cx);
 						}
 					}
 					//else debug("y: ((%u + %u) >= %u) && ((%u + %u) < (%u + %u)) failed\n", y, my, cy, y, my, h, cy);
 				}
-
-				val *= matmul;
 			}
 			// or just use original if no matrix
-			else val = ptr[x + y * w];
+			else val = data[x + y * w];
 
+			val *= diffgain;
+			
 			// store result in difference array
 			difference[x + y * w] = (float)val;
 
@@ -542,26 +540,29 @@ void ImageDiffer::CalcLevel(IMAGE *img2, double avg, double sd, std::vector<floa
 {
 	// calculate minimum level based on average and SD values, individual levels must exceed this
 	const uint_t len = img2->rect.w * img2->rect.h;
-	double diff = avgfactor * avg + sdfactor * sd, level = 0.0;	
+	double diff = avgfactor * avg + sdfactor * sd, level = 0.0, rawlevel = 0.0;
 	uint_t i;
-	
+
 	// find level = sum of levels above minimum level
 	for (i = 0; i < len; i++) {
+		rawlevel += difference[i];
 		difference[i] = std::max(difference[i] - diff, 0.0);
 		level += difference[i];
 	}
 
 	// divide by area of image and multiply up to make values arbitarily scaled
-	level = level * 1000.0 / (double)len;
+	rawlevel /= (double)len;
+	level     = level * 1000.0 / (double)len;
 
-	img2->diff  = diff;
-	img2->level = level;
+	img2->diff     = diff;
+	img2->level    = level;
+	img2->rawlevel = rawlevel;
 }
 
 void ImageDiffer::CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<float>& difference)
 {
 	const ARect& rect = img2->rect;
-	
+
 	// create detection image, if detection image directory valid
 	if (img2->detimage.Create(rect.w, rect.h)) {
 		const AImage::PIXEL *pixel1 = img1->image.GetPixelData();
@@ -569,7 +570,7 @@ void ImageDiffer::CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std
 		AImage::PIXEL *pixel = img2->detimage.GetPixelData();
 		const uint_t  len    = rect.w * rect.h;
 		uint_t i;
-		
+
 		// use individual level from above and scale and max RGB values from original images
 		for (i = 0; i < len; i++, pixel++, pixel1++, pixel2++) {
 			pixel->r = (uint8_t)limit((double)std::max(pixel1->r, pixel2->r) * difference[i] / 255.0, 0.0, 255.0);
@@ -581,12 +582,29 @@ void ImageDiffer::CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std
 
 void ImageDiffer::Process(const ADateTime& dt)
 {
-	if (cmd.Valid() && (system(cmd) == 0)) {
+	AListNode *node;
+	AString imgfile;
+
+	if (readingfromimagelist && ((node = sourceimagelist.Pop()) != NULL)) {
+		AString *str = AString::Cast(node);
+
+		if (str) {
+			imgfile = *str;
+			if ((verbose > 1) || (verbose2 > 1)) Log("Using image '%s'", imgfile.str());
+		}
+
+		delete node;
+	}
+	else if (cmd.Valid() && (system(cmd) == 0)) {
+		imgfile = tempfile;
+	}
+
+	if (imgfile.Valid()) {
 		IMAGE *img;
 
-		if ((img = CreateImage(tempfile, (const IMAGE *)imglist[imglist.Count() - 1])) != NULL) {
+		if ((img = CreateImage(imgfile, (const IMAGE *)imglist[imglist.Count() - 1])) != NULL) {
 			img->dt = dt;
-				
+
 			imglist.Add(img);
 
 			// strip unneeded images off start of image list
@@ -616,30 +634,22 @@ void ImageDiffer::Process(const ADateTime& dt)
 				CalcLevel(img2, diffavg, diffsd, difference);
 
 				const double& level = img2->level;
-				if (verbose) {
-					Log("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)",
+				if (verbose || verbose2) {
+					Log("Level = %0.1lf, (rawlevel = %0.1lf, this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)",
 						level,
+						img2->rawlevel,
 						img2->avg,
 						img2->sd,
 						diffavg,
 						diffsd,
 						img2->diff);
 				}
-				else if (verbose2) {
-					printf("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)\n",
-						   level,
-						   img2->avg,
-						   img2->sd,
-						   diffavg,
-						   diffsd,
-						   img2->diff);
-				}
-				
+
 				SetStat("level", level);
 
 				previouslevels[previouslevelindex] = level;
 				if ((++previouslevelindex) == previouslevels.size()) previouslevelindex = 0;
-				
+
 				if (detimgdir.Valid()) CreateDetectionImage(img1, img2, difference);
 
 				// should image(s) be saved?
@@ -694,7 +704,7 @@ void ImageDiffer::Process(const ADateTime& dt)
 
 					// reset detection count
 					detcount = 0;
-						
+
 					// if not a detection, run non-detection command
 					if (nodetcmd.Valid()) {
 						AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4").Arg(level));
@@ -703,23 +713,24 @@ void ImageDiffer::Process(const ADateTime& dt)
 						}
 					}
 				}
-				
+
 				// save detection data
 				if ((level >= logthreshold) && detlogfmt.Valid()) {
 					static AThreadLockObject tlock;
 					AString  	filename = imagedir.CatPath(dt.DateFormat(detlogfmt));
 					AStdFile 	fp;
 					AThreadLock lock(tlock);
-			
+
 					CreateDirectory(filename.PathPart());
 					if (fp.open(filename, "a")) {
-						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
+						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
 								  dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
 								  index,
 								  img->avg,
 								  img->sd,
 								  img->diff,
 								  img->level,
+								  img->rawlevel,
 								  threshold,
 								  logthreshold);
 						fp.close();
@@ -747,7 +758,7 @@ void ImageDiffer::SaveImage(IMAGE *img)
 			CreateDirectory(filename.PathPart());
 			img->detimage.SaveJPEG(filename, tags);
 		}
-		
+
 		// save main image
 		FILE_INFO info;
 		AString filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
@@ -756,7 +767,7 @@ void ImageDiffer::SaveImage(IMAGE *img)
 			Log("Failed to create directory '%s'", dir.str());
 			fprintf(stderr, "Failed to create directory '%s'\n", dir.str());
 		}
-		
+
 		Log("Saving detection image in '%s'", filename.str());
 		if (!img->image.SaveJPEG(filename, tags)) {
 			Log("Failed to save detection image in '%s'", filename.str());
@@ -776,17 +787,18 @@ void *ImageDiffer::Run()
 		dt += delay - 1;
 		dt -= dt % delay;
 	}
-	
-	while (!quitthread) {
+
+	while (!quitthread &&
+		   (!readingfromimagelist || (sourceimagelist.Count() > 0))) {
 		uint64_t newdt = (uint64_t)ADateTime();
 		uint64_t diff  = SUBZ(dt, newdt);
 
 		if (diff) Sleep((uint32_t)diff);
-		
+
 		if (cmd.Valid()) Process(dt);
 
 		dt += delay;
-		
+
 		CheckSettingsUpdate();
 
 		uint_t newsettingscount = settingschangecount;
@@ -803,6 +815,8 @@ void *ImageDiffer::Run()
 		}
 	}
 
+	differsrunning--;
+
 	return NULL;
 }
 
@@ -816,9 +830,9 @@ void ImageDiffer::Compare(const char *file1, const char *file2, const char *outf
 
 			// find difference between images
 			FindDifference(img1, img2, difference);
-			
+
 			CalcLevel(img2, img2->avg, img2->sd, difference);
- 
+
 			printf("Level = %0.1lf, (this frame = %0.3lf/%0.3lf, diff = %0.3lf)\n", img2->level, img2->avg, img2->sd, img2->diff);
 
 			if (outfile) {
@@ -834,11 +848,11 @@ void ImageDiffer::Compare(const char *file1, const char *file2, const char *outf
 				}
 				else debug("Failed to save detection image to '%s'\n", outfile);
 			}
-			
+
 			delete img2;
 		}
 		else debug("Failed to load image '%s'\n", file2);
-		
+
 		delete img1;
 	}
 	else debug("Failed to load image '%s'\n", file1);
