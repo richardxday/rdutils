@@ -318,7 +318,7 @@ void ImageDiffer::Configure()
 		matwid = ncols;
 		mathgt = nrows;
 
-#if 1
+#if 0
 		debug("Matrix is %u x %u:\n", matwid, mathgt);
 		for (row = 0; row < nrows; row++) {
 			for (col = 0; col < ncols; col++) debug("%8.3f", matrix[col + row * ncols]);
