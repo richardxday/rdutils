@@ -532,11 +532,14 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<dou
 		}
 	}
 
-	double thres = diffthreshold * maxdifference;
+	double rawlevel = 0.0;
+	double thres    = diffthreshold * maxdifference;
 	uint_t n = 0;
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
 			double val = difference[x + y * w];
+
+			rawlevel += val;
 			if (val >= thres) {
 				// update average and SD
 				avg2 += val;
@@ -550,8 +553,10 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<dou
 	avg2 /= (double)n;
 	sd2   = sqrt(sd2 / (double)n - avg2 * avg2);
 
-	img2->avg = avg2;
-	img2->sd  = sd2;
+	img2->avg 	   = avg2;
+	img2->sd  	   = sd2;
+	img2->rawlevel = rawlevel / (double)len;
+	img2->diff     = 0.0;
 }
 
 void ImageDiffer::CalcLevel(IMAGE *img2, double avg, double sd, std::vector<double>& difference)
@@ -653,8 +658,10 @@ void ImageDiffer::Process(const ADateTime& dt)
 				SetStat("slowavg", slowavg);
 				SetStat("slowsd",  slowsd);
 
-				CalcLevel(img2, std::max(fastavg - slowavg, 0.0), slowsd, difference);
+				//CalcLevel(img2, std::max(fastavg - slowavg, 0.0), slowsd, difference);
 
+				img2->level = std::max(fastavg - avgfactor * slowavg - sdfactor * slowsd, 0.0);
+				
 				const double& level = img2->level;
 				if (verbose || verbose2) {
 					Log("Level = %0.1lf, (rawlevel = %0.1lf, this frame = %0.3lf/%0.3lf, fast = %0.3lf/%0.3lf, slow = %0.3lf/%0.3lf, diff = %0.3lf)",
@@ -819,9 +826,12 @@ void *ImageDiffer::Run()
 	while (!quitthread &&
 		   (!readingfromimagelist || (sourceimagelist.Count() > 0))) {
 		uint64_t newdt = (uint64_t)ADateTime();
-		uint64_t diff  = SUBZ(dt, newdt);
+		uint32_t lag   = (uint32_t)SUBZ(newdt, dt);
+		uint32_t diff  = (uint32_t)SUBZ(dt, newdt);
 
-		if (diff) Sleep((uint32_t)diff);
+		if (lag >= 2000) Log("Lagging by %ums", lag);
+
+		if (diff) Sleep(diff);
 
 		if (cmd.Valid()) Process(dt);
 
