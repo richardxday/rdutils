@@ -21,9 +21,11 @@ ImageDiffer::ImageDiffer(uint_t _index) :
 	verbose(0)
 {
 	imglist.SetDestructor(&__DeleteImage);
-
-	diffavg = GetStat("avg");
-	diffsd  = GetStat("sd");
+	
+	fastavg = GetStat("fastavg");
+	fastsd  = GetStat("fastsd");
+	slowavg = GetStat("slowavg");
+	slowsd  = GetStat("slowsd");
 
 	Configure();
 
@@ -242,15 +244,17 @@ void ImageDiffer::Configure()
 	}
 	readingfromimagelist = (sourceimagelist.Count() > 0);
 
-	coeff  	  	 = (double)GetSetting("coeff", 	   	  "1.0e-3");
-	avgfactor 	 = (double)GetSetting("avgfactor", 	  "1.0");
-	sdfactor  	 = (double)GetSetting("sdfactor",  	  "2.0");
-	redscale  	 = (double)GetSetting("rscale",    	  "1.0");
-	grnscale  	 = (double)GetSetting("gscale",    	  "1.0");
-	bluscale  	 = (double)GetSetting("bscale",    	  "1.0");
-	diffgain     = (double)GetSetting("diffmul",	  "1.0") / (double)GetSetting("diffdiv", "1.0");
-	threshold 	 = (double)GetSetting("threshold", 	  "3000.0");
-	logthreshold = (double)GetSetting("logthreshold", "{threshold}").SearchAndReplace("{threshold}", GetSetting("threshold", "3000.0"));
+	fastcoeff  	  = (double)GetSetting("fastcoeff", 	  "1.0e-1");
+	slowcoeff  	  = (double)GetSetting("slowcoeff", 	  "1.0e-3");
+	avgfactor 	  = (double)GetSetting("avgfactor", 	  "1.0");
+	sdfactor  	  = (double)GetSetting("sdfactor",  	  "2.0");
+	redscale  	  = (double)GetSetting("rscale",    	  "1.0");
+	grnscale  	  = (double)GetSetting("gscale",    	  "1.0");
+	bluscale  	  = (double)GetSetting("bscale",    	  "1.0");
+	diffgain      = (double)GetSetting("diffmul",		  "1.0") / (double)GetSetting("diffdiv", "1.0");
+	diffthreshold = (double)GetSetting("diffthreshold",   ".25");
+	threshold 	  = (double)GetSetting("threshold", 	  "3000.0");
+	logthreshold  = (double)GetSetting("logthreshold", "{threshold}").SearchAndReplace("{threshold}", GetSetting("threshold", "3000.0"));
 
 	Log("Destination '%s'", imagedir.CatPath(imagefmt).str());
 	if (detimgdir.Valid()) Log("Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
@@ -312,7 +316,7 @@ void ImageDiffer::Configure()
 		for (row = 0; row < nrows; row++) {
 			AString line = _matrix.Line(row,";");
 
-			for (col = 0; col < ncols; col++) matrix[col + row * ncols] = (float)line.Line(col, ",");
+			for (col = 0; col < ncols; col++) matrix[col + row * ncols] = (double)line.Line(col, ",");
 		}
 
 		matwid = ncols;
@@ -321,7 +325,7 @@ void ImageDiffer::Configure()
 #if 0
 		debug("Matrix is %u x %u:\n", matwid, mathgt);
 		for (row = 0; row < nrows; row++) {
-			for (col = 0; col < ncols; col++) debug("%8.3f", matrix[col + row * ncols]);
+			for (col = 0; col < ncols; col++) debug("%8.3lf", matrix[col + row * ncols]);
 			debug("\n");
 		}
 #endif
@@ -383,14 +387,14 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *
 	return img;
 }
 
-void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<float>& difference)
+void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<double>& difference)
 {
 	const AImage::PIXEL *pix1 = img1->image.GetPixelData();
 	const AImage::PIXEL *pix2 = img2->image.GetPixelData();
 	const ARect& rect = img1->rect;
 	const uint_t w = rect.w, h = rect.h, len = w * h;
-	std::vector<float> data;
-	float  *p;
+	std::vector<double> data;
+	double  *p;
 	double avg[3];
 	uint_t x, y;
 
@@ -409,9 +413,9 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 
 		// subtract pixels and update per-component average
 		for (x = 0; x < w; x++, p += 3, pix1++, pix2++) {
-			p[0]     = ((float)pix1->r - (float)pix2->r) * redscale;
-			p[1]     = ((float)pix1->g - (float)pix2->g) * grnscale;
-			p[2]     = ((float)pix1->b - (float)pix2->b) * bluscale;
+			p[0]     = ((double)pix1->r - (double)pix2->r) * redscale;
+			p[1]     = ((double)pix1->g - (double)pix2->g) * grnscale;
+			p[2]     = ((double)pix1->b - (double)pix2->b) * bluscale;
 
 			yavg[0] += p[0];
 			yavg[1] += p[1];
@@ -448,7 +452,7 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 		if (n != gaindata.size()) {
 			static const AImage::PIXEL white = {255, 255, 255, 0};
 			const AImage::PIXEL *gainptr = gainimage.GetPixelData() ? gainimage.GetPixelData() : &white;
-			float sum = 0.f;
+			double sum = 0.f;
 
 			gaindata.resize(n);
 
@@ -462,16 +466,16 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 					// get ptr to pixel data
 					const AImage::PIXEL *p = gainptr + x2 + y2 * gainwid;
 
-					// convert pixel into RGB floating point values 0-1
-					gaindata[i] = (float)p->r / 255.f; sum += gaindata[i++];
-					gaindata[i] = (float)p->g / 255.f; sum += gaindata[i++];
-					gaindata[i] = (float)p->b / 255.f; sum += gaindata[i++];
+					// convert pixel into RGB doubleing point values 0-1
+					gaindata[i] = (double)p->r / 255.f; sum += gaindata[i++];
+					gaindata[i] = (double)p->g / 255.f; sum += gaindata[i++];
+					gaindata[i] = (double)p->b / 255.f; sum += gaindata[i++];
 				}
 			}
 
 			// scale all gain data up so it sums to w * h * 3
 			if (sum > 0.f) {
-				sum = (float)n / sum;
+				sum = (double)n / sum;
 
 				for (i = 0; i < n; i++) gaindata[i] *= sum;
 			}
@@ -480,7 +484,7 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 
 	// subtract overall average from pixel data, scale by gain image and
 	// calculate modulus
-	float *p2, *p3;
+	double *p2, *p3;
 	for (y = 0, p = &data[0], p2 = &data[0], p3 = &gaindata[0]; y < h; y++) {
 		for (x = 0; x < w; x++, p += 3, p2++, p3 += 3) {
 			p[0] -= avg[0];
@@ -495,10 +499,11 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 
 	// find average and SD of resultant difference data with matrix applied
 	double avg2 = 0.0, sd2 = 0.0;
+	double maxdifference = 0.0;
 	uint_t mx, my, cx = (matwid - 1) >> 1, cy = (mathgt - 1) >> 1;
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
-			float val = 0.f;
+			double val = 0.0;
 
 			// apply matrix to data
 			if (matwid && mathgt) {
@@ -520,23 +525,36 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<flo
 			val *= diffgain;
 			
 			// store result in difference array
-			difference[x + y * w] = (float)val;
+			difference[x + y * w] = val;
 
-			// update average and SD
-			avg2 += val;
-			sd2  += val * val;
+			// find maximum difference
+			maxdifference = std::max(maxdifference, val);
+		}
+	}
+
+	double thres = diffthreshold * maxdifference;
+	uint_t n = 0;
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
+			double val = difference[x + y * w];
+			if (val >= thres) {
+				// update average and SD
+				avg2 += val;
+				sd2  += val * val;
+				n++;
+			}
 		}
 	}
 
 	// calculate final average and SD
-	avg2 /= (double)len;
-	sd2   = sqrt(sd2 / (double)len - avg2 * avg2);
+	avg2 /= (double)n;
+	sd2   = sqrt(sd2 / (double)n - avg2 * avg2);
 
 	img2->avg = avg2;
 	img2->sd  = sd2;
 }
 
-void ImageDiffer::CalcLevel(IMAGE *img2, double avg, double sd, std::vector<float>& difference)
+void ImageDiffer::CalcLevel(IMAGE *img2, double avg, double sd, std::vector<double>& difference)
 {
 	// calculate minimum level based on average and SD values, individual levels must exceed this
 	const uint_t len = img2->rect.w * img2->rect.h;
@@ -559,7 +577,7 @@ void ImageDiffer::CalcLevel(IMAGE *img2, double avg, double sd, std::vector<floa
 	img2->rawlevel = rawlevel;
 }
 
-void ImageDiffer::CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<float>& difference)
+void ImageDiffer::CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<double>& difference)
 {
 	const ARect& rect = img2->rect;
 
@@ -618,30 +636,36 @@ void ImageDiffer::Process(const ADateTime& dt)
 			if (imglist.Count() >= 2) {
 				const IMAGE *img1 = (const IMAGE *)imglist[imglist.Count() - 2];
 				IMAGE *img2       = (IMAGE       *)imglist[imglist.Count() - 1];
-				std::vector<float> difference;
+				std::vector<double> difference;
 
 				// find difference between images
 				FindDifference(img1, img2, difference);
 
 				// filter values
-				Interpolate(diffavg, img2->avg, coeff);
-				Interpolate(diffsd,  img2->sd,  coeff);
+				Interpolate(fastavg, img2->avg, fastcoeff);
+				Interpolate(fastsd,  img2->sd,  fastcoeff);
+				Interpolate(slowavg, img2->avg, slowcoeff);
+				Interpolate(slowsd,  img2->sd,  slowcoeff);
 
 				// store values in settings handler
-				SetStat("avg", diffavg);
-				SetStat("sd",  diffsd);
+				SetStat("fastavg", fastavg);
+				SetStat("fastsd",  fastsd);
+				SetStat("slowavg", slowavg);
+				SetStat("slowsd",  slowsd);
 
-				CalcLevel(img2, diffavg, diffsd, difference);
+				CalcLevel(img2, std::max(fastavg - slowavg, 0.0), slowsd, difference);
 
 				const double& level = img2->level;
 				if (verbose || verbose2) {
-					Log("Level = %0.1lf, (rawlevel = %0.1lf, this frame = %0.3lf/%0.3lf, filtered = %0.3lf/%0.3lf, diff = %0.3lf)",
+					Log("Level = %0.1lf, (rawlevel = %0.1lf, this frame = %0.3lf/%0.3lf, fast = %0.3lf/%0.3lf, slow = %0.3lf/%0.3lf, diff = %0.3lf)",
 						level,
 						img2->rawlevel,
 						img2->avg,
 						img2->sd,
-						diffavg,
-						diffsd,
+						fastavg,
+						fastsd,
+						slowavg,
+						slowsd,
 						img2->diff);
 				}
 
@@ -723,18 +747,20 @@ void ImageDiffer::Process(const ADateTime& dt)
 
 					CreateDirectory(filename.PathPart());
 					if (fp.open(filename, "a")) {
-						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
-								  dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
-								  index,
-								  img->avg,
-								  img->sd,
-								  diffavg,
-								  diffsd,
-								  img->diff,
-								  img->level,
-								  img->rawlevel,
-								  threshold,
-								  logthreshold);
+						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
+								  /*  1,2 */ dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
+								  /*  3 */ index,
+								  /*  4 */ img->avg,
+								  /*  5 */ img->sd,
+								  /*  6 */ fastavg,
+								  /*  7 */ fastsd,
+								  /*  8 */ slowavg,
+								  /*  9 */ slowsd,
+								  /* 10 */ img->diff,
+								  /* 11 */ img->level,
+								  /* 12 */ img->rawlevel,
+								  /* 13 */ threshold,
+								  /* 14 */ logthreshold);
 						fp.close();
 					}
 				}
@@ -828,7 +854,7 @@ void ImageDiffer::Compare(const char *file1, const char *file2, const char *outf
 
 	if ((img1 = CreateImage(file1)) != NULL) {
 		if ((img2 = CreateImage(file2)) != NULL) {
-			std::vector<float> difference;
+			std::vector<double> difference;
 
 			// find difference between images
 			FindDifference(img1, img2, difference);

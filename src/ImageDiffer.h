@@ -51,9 +51,9 @@ protected:
 	IMAGE *CreateImage(const char *filename, const IMAGE *img0 = NULL);
 	void SaveImage(IMAGE *img);
 
-	void FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<float>& difference);
-	void CalcLevel(IMAGE *img2, double avg, double sd, std::vector<float>& difference);
-	void CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<float>& difference);
+	void FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<double>& difference);
+	void CalcLevel(IMAGE *img2, double avg, double sd, std::vector<double>& difference);
+	void CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<double>& difference);
 
 	bool SettingExists(const AString& name);
 	AString GetSetting(const AString& name, const AString& defval = "");
@@ -116,19 +116,23 @@ protected:
 	AImage					gainimage;
 	AList					sourceimagelist;
 	bool				    readingfromimagelist;
-	std::vector<float>		gaindata;
-	double    			  	diffavg;
-	double    			  	diffsd;
-	double    			  	coeff;
+	std::vector<double>		gaindata;
+	double    			  	fastcoeff;
+	double    			  	slowcoeff;
+	double    			  	fastavg;
+	double    			  	fastsd;
+	double    			  	slowavg;
+	double    			  	slowsd;
 	double    			  	avgfactor;
 	double    			  	sdfactor;
 	double    			  	redscale;
 	double    			  	grnscale;
 	double    			  	bluscale;
 	double					diffgain;
+	double					diffthreshold;
 	double    			  	threshold;
 	double    			  	logthreshold;
-	std::vector<float>		matrix;
+	std::vector<double>		matrix;
 	std::vector<double>		previouslevels;
 	size_t					previouslevelindex;
 	uint_t					predetectionimages;
