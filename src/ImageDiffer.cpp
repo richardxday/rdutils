@@ -21,7 +21,7 @@ ImageDiffer::ImageDiffer(uint_t _index) :
 	verbose(0)
 {
 	imglist.SetDestructor(&__DeleteImage);
-	
+
 	fastavg = GetStat("fastavg");
 	fastsd  = GetStat("fastsd");
 	slowavg = GetStat("slowavg");
@@ -523,7 +523,7 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<dou
 			else val = data[x + y * w];
 
 			val *= diffgain;
-			
+
 			// store result in difference array
 			difference[x + y * w] = val;
 
@@ -660,8 +660,8 @@ void ImageDiffer::Process(const ADateTime& dt)
 
 				//CalcLevel(img2, std::max(fastavg - slowavg, 0.0), slowsd, difference);
 
-				img2->level = std::max(fastavg - avgfactor * slowavg - sdfactor * slowsd, 0.0);
-				
+				img2->level = fastavg - avgfactor * slowavg - sdfactor * slowsd;
+
 				const double& level = img2->level;
 				if (verbose || verbose2) {
 					Log("Level = %0.1lf, (rawlevel = %0.1lf, this frame = %0.3lf/%0.3lf, fast = %0.3lf/%0.3lf, slow = %0.3lf/%0.3lf, diff = %0.3lf)",
@@ -757,15 +757,15 @@ void ImageDiffer::Process(const ADateTime& dt)
 						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
 								  /*  1,2 */ dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
 								  /*  3 */ index,
-								  /*  4 */ img->avg,
-								  /*  5 */ img->sd,
+								  /*  4 */ img2->avg,
+								  /*  5 */ img2->sd,
 								  /*  6 */ fastavg,
 								  /*  7 */ fastsd,
 								  /*  8 */ slowavg,
 								  /*  9 */ slowsd,
-								  /* 10 */ img->diff,
-								  /* 11 */ img->level,
-								  /* 12 */ img->rawlevel,
+								  /* 10 */ img2->diff,
+								  /* 11 */ img2->level,
+								  /* 12 */ img2->rawlevel,
 								  /* 13 */ threshold,
 								  /* 14 */ logthreshold);
 						fp.close();
@@ -818,11 +818,6 @@ void *ImageDiffer::Run()
 {
 	uint64_t dt = (uint64_t)ADateTime();
 
-	if (delay) {
-		dt += delay - 1;
-		dt -= dt % delay;
-	}
-
 	while (!quitthread &&
 		   (!readingfromimagelist || (sourceimagelist.Count() > 0))) {
 		uint64_t newdt = (uint64_t)ADateTime();
@@ -832,6 +827,8 @@ void *ImageDiffer::Run()
 		if (lag >= 2000) Log("Lagging by %ums", lag);
 
 		if (diff) Sleep(diff);
+
+		dt = (uint64_t)ADateTime();
 
 		if (cmd.Valid()) Process(dt);
 
@@ -846,10 +843,6 @@ void *ImageDiffer::Run()
 			Configure();
 
 			dt = (uint64_t)ADateTime();
-			if (delay) {
-				dt += delay - 1;
-				dt -= dt % delay;
-			}
 		}
 	}
 
