@@ -760,7 +760,8 @@ void ImageDiffer::Process(const ADateTime& dt)
 				if (level >= logthreshold) {
 					LogDetection(img2);
 				}
-				else lastdetectionlogged = false;
+
+				lastdetectionlogged = img2->logged;
 			}
 		}
 	}
