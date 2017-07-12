@@ -18,7 +18,8 @@ ImageDiffer::ImageDiffer(uint_t _index) :
 	AThread(),
 	index(_index),
 	settingschange(settingschangecount),
-	verbose(0)
+	verbose(0),
+	lastdetectionlogged(false)
 {
 	imglist.SetDestructor(&__DeleteImage);
 
@@ -194,45 +195,46 @@ AString ImageDiffer::CreateCaptureCommand()
 void ImageDiffer::Configure()
 {
 	AString indexstr = AString("%").Arg(index);
-	verbose   	 = (uint_t)GetSetting("verbose",      "0");
-	verbose2  	 = (uint_t)GetSetting("verbose2",     "0");
-	timeout      = (uint_t)GetSetting("timeout",	  "20");
+	verbose   	  = (uint_t)GetSetting("verbose",      "0");
+	verbose2  	  = (uint_t)GetSetting("verbose2",     "0");
+	timeout       = (uint_t)GetSetting("timeout",	  "20");
 
-	logpath      = GetSetting("loglocation", "/var/log/imagediff");
-	name         = GetSetting("name");
-	delay        = (uint_t)(1000.0 * (double)GetSetting("delay", "1"));
-	wgetargs  	 = GetSetting("wgetargs");
-	cameraurl    = GetSetting("cameraurl");
-	videosrc     = GetSetting("videosrc");
-	streamerargs = GetSetting("streamerargs", "-s 640x480");
-	capturecmd   = GetSetting("capturecmd").DeEscapify();
-	tempfile  	 = (GetSetting("tempfile", AString("/home/%/temp-{index}.jpeg").Arg(getenv("LOGNAME"))).
-					SearchAndReplace("{index}", indexstr));
-	imagedir  	 = (GetSetting("imagedir", "/media/cctv").
-					SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
-					SearchAndReplace("{index}",     indexstr));
-	imagefmt  	 = (GetSetting("filename", "%Y-%M-%D-{name}/%h/Image-%Y-%M-%D-%h-%m-%s-%S").
-					SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
-					SearchAndReplace("{index}",     indexstr));
-	detlogfmt 	 = (GetSetting("detlogfilename", "detection.dat").
-					SearchAndReplace("{imagepath}", imagefmt.PathPart()).
-					SearchAndReplace("{imagename}", imagefmt.FilePart()).
-					SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
-					SearchAndReplace("{index}", 	indexstr));
-	detimgdir 	 = (GetSetting("detimagedir").
-					SearchAndReplace("{imagedir}",  imagedir).
-					SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
-					SearchAndReplace("{index}",     indexstr));
-	detimgfmt 	 = (GetSetting("detfilename", "{imagepath}/detection/{imagename}").
-					SearchAndReplace("{imagepath}", imagefmt.PathPart()).
-					SearchAndReplace("{imagename}", imagefmt.FilePart()).
-					SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
-					SearchAndReplace("{index}", 	indexstr));
-	detcmd    	 = GetSetting("detcommand").SearchAndReplace("{index}", indexstr);
-	detstartcmd  = GetSetting("detstartcommand").SearchAndReplace("{index}", indexstr);
-	detendcmd    = GetSetting("detendcommand").SearchAndReplace("{index}", indexstr);
-	nodetcmd  	 = GetSetting("nodetcommand").SearchAndReplace("{index}", indexstr);
-
+	logpath       = GetSetting("loglocation", "/var/log/imagediff");
+	name          = GetSetting("name");
+	delay         = (uint_t)(1000.0 * (double)GetSetting("delay", "1"));
+	wgetargs  	  = GetSetting("wgetargs");
+	cameraurl     = GetSetting("cameraurl");
+	videosrc      = GetSetting("videosrc");
+	streamerargs  = GetSetting("streamerargs", "-s 640x480");
+	capturecmd    = GetSetting("capturecmd").DeEscapify();
+	tempfile  	  = (GetSetting("tempfile", AString("/home/%/temp-{index}.jpeg").Arg(getenv("LOGNAME"))).
+				  	SearchAndReplace("{index}", indexstr));
+	imagedir  	  = (GetSetting("imagedir", "/media/cctv").
+				  	SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
+				  	SearchAndReplace("{index}",     indexstr));
+	imagefmt  	  = (GetSetting("filename", "%Y-%M-%D-{name}/%h/Image-%Y-%M-%D-%h-%m-%s-%S").
+				  	SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
+				  	SearchAndReplace("{index}",     indexstr));
+	detlogfmt 	  = (GetSetting("detlogfilename", "detection.dat").
+				  	SearchAndReplace("{imagepath}", imagefmt.PathPart()).
+				  	SearchAndReplace("{imagename}", imagefmt.FilePart()).
+				  	SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
+				  	SearchAndReplace("{index}", 	indexstr));
+	detimgdir 	  = (GetSetting("detimagedir").
+				  	SearchAndReplace("{imagedir}",  imagedir).
+				  	SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
+				  	SearchAndReplace("{index}",     indexstr));
+	detimgfmt 	  = (GetSetting("detfilename", "{imagepath}/detection/{imagename}").
+				  	SearchAndReplace("{imagepath}", imagefmt.PathPart()).
+				  	SearchAndReplace("{imagename}", imagefmt.FilePart()).
+				  	SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
+				  	SearchAndReplace("{index}", 	indexstr));
+	detcmd    	  = GetSetting("detcommand").SearchAndReplace("{index}", indexstr);
+	detstartcmd   = GetSetting("detstartcommand").SearchAndReplace("{index}", indexstr);
+	detendcmd     = GetSetting("detendcommand").SearchAndReplace("{index}", indexstr);
+	nodetcmd  	  = GetSetting("nodetcommand").SearchAndReplace("{index}", indexstr);
+	logdetections = ((uint_t)GetSetting("logdetections", "0") != 0);
+	
 	sourceimagelist.DeleteAll();
 	AString imgdir = GetSetting("imagesourcedir");
 	if (imgdir.Valid()) {
@@ -366,6 +368,7 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *
 			img->filename = filename;
 			img->rect     = image.GetRect();
 			img->saved    = false;
+			img->logged   = false;
 
 			if (!img0) {
 				Log("New set of images size %dx%d", img->rect.w, img->rect.h);
@@ -652,6 +655,11 @@ void ImageDiffer::Process(const ADateTime& dt)
 				Interpolate(slowavg, img2->avg, slowcoeff);
 				Interpolate(slowsd,  img2->sd,  slowcoeff);
 
+				img2->fastavg = fastavg;
+				img2->fastsd  = fastsd;
+				img2->slowavg = slowavg;
+				img2->slowsd  = slowsd;
+				
 				// store values in settings handler
 				SetStat("fastavg", fastavg);
 				SetStat("fastsd",  fastsd);
@@ -696,6 +704,9 @@ void ImageDiffer::Process(const ADateTime& dt)
 					// save any unsaved images, including latest
 					for (; i < imglist.Count(); i++) {
 						SaveImage((IMAGE *)imglist[i]);
+						if (logdetections || (logthreshold <= threshold)) {
+							LogDetection((IMAGE *)imglist[i]);
+						}
 					}
 
 					// if a detection has been found, force the next postdetectionimages to be saved
@@ -746,31 +757,10 @@ void ImageDiffer::Process(const ADateTime& dt)
 				}
 
 				// save detection data
-				if ((level >= logthreshold) && detlogfmt.Valid()) {
-					static AThreadLockObject tlock;
-					AString  	filename = imagedir.CatPath(dt.DateFormat(detlogfmt));
-					AStdFile 	fp;
-					AThreadLock lock(tlock);
-
-					CreateDirectory(filename.PathPart());
-					if (fp.open(filename, "a")) {
-						fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
-								  /*  1,2 */ dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
-								  /*  3 */ index,
-								  /*  4 */ img2->avg,
-								  /*  5 */ img2->sd,
-								  /*  6 */ fastavg,
-								  /*  7 */ fastsd,
-								  /*  8 */ slowavg,
-								  /*  9 */ slowsd,
-								  /* 10 */ img2->diff,
-								  /* 11 */ img2->level,
-								  /* 12 */ img2->rawlevel,
-								  /* 13 */ threshold,
-								  /* 14 */ logthreshold);
-						fp.close();
-					}
+				if (level >= logthreshold) {
+					LogDetection(img2);
 				}
+				else lastdetectionlogged = false;
 			}
 		}
 	}
@@ -811,6 +801,40 @@ void ImageDiffer::SaveImage(IMAGE *img)
 
 		// mark as saved
 		img->saved = true;
+	}
+}
+
+void ImageDiffer::LogDetection(IMAGE *img)
+{
+	if (detlogfmt.Valid() && !img->logged) {
+		static AThreadLockObject tlock;
+		AString  	filename = imagedir.CatPath(img->dt.DateFormat(detlogfmt));
+		AStdFile 	fp;
+		AThreadLock lock(tlock);
+
+		CreateDirectory(filename.PathPart());
+		if (fp.open(filename, "a")) {
+			if (!lastdetectionlogged) fp.printf("\n");
+						
+			fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
+					  /*  1,2 */ img->dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
+					  /*  3 */ index,
+					  /*  4 */ img->avg,
+					  /*  5 */ img->sd,
+					  /*  6 */ img->fastavg,
+					  /*  7 */ img->fastsd,
+					  /*  8 */ img->slowavg,
+					  /*  9 */ img->slowsd,
+					  /* 10 */ img->diff,
+					  /* 11 */ img->level,
+					  /* 12 */ img->rawlevel,
+					  /* 13 */ threshold,
+					  /* 14 */ logthreshold);
+			fp.close();
+
+			lastdetectionlogged = true;
+			img->logged = true;
+		}
 	}
 }
 

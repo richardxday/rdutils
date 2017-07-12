@@ -39,7 +39,12 @@ protected:
 		double	  diff;
 		double	  level;
 		double	  rawlevel;
+		double    fastavg;
+		double    fastsd;
+		double	  slowavg;
+		double	  slowsd;
 		bool	  saved;
+		bool	  logged;
 	} IMAGE;
 
 	static void __DeleteImage(uptr_t item, void *context) {
@@ -50,7 +55,8 @@ protected:
 
 	IMAGE *CreateImage(const char *filename, const IMAGE *img0 = NULL);
 	void SaveImage(IMAGE *img);
-
+	void LogDetection(IMAGE *img);
+	
 	void FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<double>& difference);
 	void CalcLevel(IMAGE *img2, double avg, double sd, std::vector<double>& difference);
 	void CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<double>& difference);
@@ -144,6 +150,8 @@ protected:
 	uint_t				    verbose;
 	uint_t					verbose2;
 	uint_t					timeout;
+	bool					logdetections;
+	bool					lastdetectionlogged;
 	
 	static uint_t			settingschangecount;
 	static uint_t			differsrunning;
