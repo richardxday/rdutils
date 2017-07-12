@@ -455,7 +455,6 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<dou
 		if (n != gaindata.size()) {
 			static const AImage::PIXEL white = {255, 255, 255, 0};
 			const AImage::PIXEL *gainptr = gainimage.GetPixelData() ? gainimage.GetPixelData() : &white;
-			double sum = 0.f;
 
 			gaindata.resize(n);
 
@@ -470,17 +469,10 @@ void ImageDiffer::FindDifference(const IMAGE *img1, IMAGE *img2, std::vector<dou
 					const AImage::PIXEL *p = gainptr + x2 + y2 * gainwid;
 
 					// convert pixel into RGB doubleing point values 0-1
-					gaindata[i] = (double)p->r / 255.f; sum += gaindata[i++];
-					gaindata[i] = (double)p->g / 255.f; sum += gaindata[i++];
-					gaindata[i] = (double)p->b / 255.f; sum += gaindata[i++];
+					gaindata[i++] = (double)p->r / 255.f;
+					gaindata[i++] = (double)p->g / 255.f;
+					gaindata[i++] = (double)p->b / 255.f;
 				}
-			}
-
-			// scale all gain data up so it sums to w * h * 3
-			if (sum > 0.f) {
-				sum = (double)n / sum;
-
-				for (i = 0; i < n; i++) gaindata[i] *= sum;
 			}
 		}
 	}
