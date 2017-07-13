@@ -45,7 +45,7 @@ ImageDiffer::~ImageDiffer()
 
 void ImageDiffer::Log(uint_t level, const char *fmt, ...)
 {
-	if ((verbose >= level) || (verbose2 >= level)) {
+	if ((verbose >= level) || (verbose2 > level)) {
 		va_list ap;
 		va_start(ap, fmt);
 		Log(level, fmt, ap);
@@ -73,7 +73,7 @@ void ImageDiffer::Log(uint_t level, const char *fmt, va_list ap)
 		}
 	}
 
-	if (verbose2 >= level) {
+	if (verbose2 > level) {
 		printf("%s\n", str.str());
 	}
 }
