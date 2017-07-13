@@ -30,28 +30,30 @@ ImageDiffer::ImageDiffer(uint_t _index) :
 
 	Configure();
 
-	Log("New differ");
+	Log(0, "New differ");
 
 	differsrunning++;
 }
 
 ImageDiffer::~ImageDiffer()
 {
-	Log("Shutting down");
+	Log(0, "Shutting down");
 	remove(tempfile);
 
 	Stop();
 }
 
-void ImageDiffer::Log(const char *fmt, ...)
+void ImageDiffer::Log(uint_t level, const char *fmt, ...)
 {
-	va_list ap;
-	va_start(ap, fmt);
-	Log(index, fmt, ap);
-	va_end(ap);
+	if ((verbose >= level) || (verbose2 >= level)) {
+		va_list ap;
+		va_start(ap, fmt);
+		Log(level, fmt, ap);
+		va_end(ap);
+	}
 }
 
-void ImageDiffer::Log(uint_t index, const char *fmt, va_list ap)
+void ImageDiffer::Log(uint_t level, const char *fmt, va_list ap)
 {
 	static AThreadLockObject loglock;
 	ADateTime dt;
@@ -62,7 +64,7 @@ void ImageDiffer::Log(uint_t index, const char *fmt, va_list ap)
 	str.printf("%s[%u]: ", dt.DateFormat("%Y-%M-%D %h:%m:%s").str(), index);
 	str.vprintf(fmt, ap);
 
-	if (verbose > 0) {
+	if (verbose >= level) {
 		AThreadLock lock(loglock);
 		CreateDirectory(filename.PathPart());
 		if (fp.open(filename, "a")) {
@@ -71,7 +73,7 @@ void ImageDiffer::Log(uint_t index, const char *fmt, va_list ap)
 		}
 	}
 
-	if (verbose2 > 0) {
+	if (verbose2 >= level) {
 		printf("%s\n", str.str());
 	}
 }
@@ -187,7 +189,7 @@ AString ImageDiffer::CreateCaptureCommand()
 	else if (capturecmd.Valid()) {
 		cmd.printf("%s 2>/dev/null", capturecmd.SearchAndReplace("{file}", tempfile).str());
 	}
-	else Log("No valid capture command!");
+	else Log(0, "No valid capture command!");
 
 	return cmd;
 }
@@ -240,9 +242,9 @@ void ImageDiffer::Configure()
 	if (imgdir.Valid()) {
 		extern AQuitHandler quithandler;
 
-		Log("Finding files in '%s'...", imgdir.str());
+		Log(0, "Finding files in '%s'...", imgdir.str());
 		CollectFiles(imgdir, "*.jpg", RECURSE_ALL_SUBDIRS, sourceimagelist, FILE_FLAG_IS_DIR, 0, &quithandler);
-		Log("Found %u files in '%s'", sourceimagelist.Count(), imgdir.str());
+		Log(0, "Found %u files in '%s'", sourceimagelist.Count(), imgdir.str());
 	}
 	readingfromimagelist = (sourceimagelist.Count() > 0);
 
@@ -258,13 +260,13 @@ void ImageDiffer::Configure()
 	threshold 	  = (double)GetSetting("threshold", 	  "3000.0");
 	logthreshold  = (double)GetSetting("logthreshold", "{threshold}").SearchAndReplace("{threshold}", GetSetting("threshold", "3000.0"));
 
-	Log("Destination '%s'", imagedir.CatPath(imagefmt).str());
-	if (detimgdir.Valid()) Log("Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
-	if (detlogfmt.Valid()) Log("Detection log '%s' with threshold %0.1lf", imagedir.CatPath(detlogfmt).str(), logthreshold);
+	Log(0, "Destination '%s'", imagedir.CatPath(imagefmt).str());
+	if (detimgdir.Valid()) Log(0, "Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
+	if (detlogfmt.Valid()) Log(0, "Detection log '%s' with threshold %0.1lf", imagedir.CatPath(detlogfmt).str(), logthreshold);
 
 	cmd = CreateCaptureCommand();
 
-	Log("Capture command '%s'", cmd.str());
+	Log(0, "Capture command '%s'", cmd.str());
 
 	detcount = 0;
 
@@ -275,10 +277,10 @@ void ImageDiffer::Configure()
 		filename = GetSetting("maskimage");
 		if (filename.Valid()) {
 			if (maskimage.Load(filename)) {
-				Log("Loaded mask image '%s'", filename.str());
+				Log(0, "Loaded mask image '%s'", filename.str());
 			}
 			else {
-				Log("Failed to load mask image '%s'", filename.str());
+				Log(0, "Failed to load mask image '%s'", filename.str());
 			}
 		}
 
@@ -286,10 +288,10 @@ void ImageDiffer::Configure()
 		filename = GetSetting("gainimage");
 		if (filename.Valid()) {
 			if (gainimage.Load(filename)) {
-				Log("Loaded gain image '%s'", filename.str());
+				Log(0, "Loaded gain image '%s'", filename.str());
 			}
 			else {
-				Log("Failed to load gain image '%s'", filename.str());
+				Log(0, "Failed to load gain image '%s'", filename.str());
 			}
 		}
 		gaindata.resize(0);
@@ -347,7 +349,7 @@ void ImageDiffer::Configure()
 			cmd.printf("%s -O /dev/null", CreateWGetCommand(GetSetting(str)).str());
 
 			if (system(cmd) == 0) {
-				Log("Ran '%s' successfully", cmd.str());
+				Log(0, "Ran '%s' successfully", cmd.str());
 			}
 		}
 	}
@@ -371,17 +373,17 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *
 			img->logged   = false;
 
 			if (!img0) {
-				Log("New set of images size %dx%d", img->rect.w, img->rect.h);
+				Log(0, "New set of images size %dx%d", img->rect.w, img->rect.h);
 			}
 			else if (img0 && (img0->rect != img->rect)) {
-				Log("Images are different sizes (%dx%d -> %dx%d), deleting image list",
+				Log(0, "Images are different sizes (%dx%d -> %dx%d), deleting image list",
 					img0->rect.w, img0->rect.h, img->rect.w, img->rect.h);
 
 				imglist.DeleteList();
 			}
 		}
 		else {
-			Log("Failed to load image '%s'", filename);
+			Log(0, "Failed to load image '%s'", filename);
 			delete img;
 			img = NULL;
 		}
@@ -608,7 +610,7 @@ void ImageDiffer::Process(const ADateTime& dt)
 
 		if (str) {
 			imgfile = *str;
-			if ((verbose > 1) || (verbose2 > 1)) Log("Using image '%s'", imgfile.str());
+			Log(2, "Using image '%s'", imgfile.str());
 		}
 
 		delete node;
@@ -663,18 +665,16 @@ void ImageDiffer::Process(const ADateTime& dt)
 				img2->level = fastavg - avgfactor * slowavg - sdfactor * slowsd;
 
 				const double& level = img2->level;
-				if (verbose || verbose2) {
-					Log("Level = %0.1lf, (rawlevel = %0.1lf, this frame = %0.3lf/%0.3lf, fast = %0.3lf/%0.3lf, slow = %0.3lf/%0.3lf, diff = %0.3lf)",
-						level,
-						img2->rawlevel,
-						img2->avg,
-						img2->sd,
-						fastavg,
-						fastsd,
-						slowavg,
-						slowsd,
-						img2->diff);
-				}
+				Log(1, "Level = %0.1lf, (rawlevel = %0.1lf, this frame = %0.3lf/%0.3lf, fast = %0.3lf/%0.3lf, slow = %0.3lf/%0.3lf, diff = %0.3lf)",
+					level,
+					img2->rawlevel,
+					img2->avg,
+					img2->sd,
+					fastavg,
+					fastsd,
+					slowavg,
+					slowsd,
+					img2->diff);
 
 				SetStat("level", level);
 
@@ -712,7 +712,7 @@ void ImageDiffer::Process(const ADateTime& dt)
 					if (!detcount && detstartcmd.Valid()) {
 						AString cmd = detstartcmd.SearchAndReplace("{level}", AString("%0.4").Arg(level));
 						if (system(cmd) != 0) {
-							Log("Detection start command '%s' failed", cmd.str());
+							Log(0, "Detection start command '%s' failed", cmd.str());
 						}
 					}
 
@@ -723,7 +723,7 @@ void ImageDiffer::Process(const ADateTime& dt)
 					if (detcmd.Valid()) {
 						AString cmd = detcmd.SearchAndReplace("{level}", AString("%0.4").Arg(level)).SearchAndReplace("{detcount}", AString("%").Arg(detcount));
 						if (system(cmd) != 0) {
-							Log("Detection command '%s' failed", cmd.str());
+							Log(0, "Detection command '%s' failed", cmd.str());
 						}
 					}
 				}
@@ -732,7 +732,7 @@ void ImageDiffer::Process(const ADateTime& dt)
 					if (detcount && detendcmd.Valid()) {
 						AString cmd = detendcmd.SearchAndReplace("{level}", AString("%0.4").Arg(level)).SearchAndReplace("{detcount}", AString("%").Arg(detcount));
 						if (system(cmd) != 0) {
-							Log("Detection end command '%s' failed", cmd.str());
+							Log(0, "Detection end command '%s' failed", cmd.str());
 						}
 					}
 
@@ -743,7 +743,7 @@ void ImageDiffer::Process(const ADateTime& dt)
 					if (nodetcmd.Valid()) {
 						AString cmd = nodetcmd.SearchAndReplace("{level}", AString("%0.4").Arg(level));
 						if (system(cmd) != 0) {
-							Log("No-detection command '%s' failed", cmd.str());
+							Log(0, "No-detection command '%s' failed", cmd.str());
 						}
 					}
 				}
@@ -757,7 +757,7 @@ void ImageDiffer::Process(const ADateTime& dt)
 			}
 		}
 	}
-	else Log("Failed to fetch image using '%s'", cmd.str());
+	else Log(0, "Failed to fetch image using '%s'", cmd.str());
 }
 
 void ImageDiffer::SaveImage(IMAGE *img)
@@ -782,14 +782,12 @@ void ImageDiffer::SaveImage(IMAGE *img)
 		AString filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
 		AString dir      = filename.PathPart();
 		if (!GetFileInfo(dir, &info) && !CreateDirectory(dir)) {
-			Log("Failed to create directory '%s'", dir.str());
-			fprintf(stderr, "Failed to create directory '%s'\n", dir.str());
+			Log(0, "Failed to create directory '%s'", dir.str());
 		}
 
-		Log("Saving detection image in '%s'", filename.str());
+		Log(1, "Saving detection image in '%s'", filename.str());
 		if (!img->image.SaveJPEG(filename, tags)) {
-			Log("Failed to save detection image in '%s'", filename.str());
-			fprintf(stderr, "Failed to save detection image in '%s'\n", filename.str());
+			Log(0, "Failed to save detection image in '%s'", filename.str());
 		}
 
 		// mark as saved
@@ -838,14 +836,17 @@ void *ImageDiffer::Run()
 	while (!quitthread &&
 		   (!readingfromimagelist || (sourceimagelist.Count() > 0))) {
 		uint64_t newdt = (uint64_t)ADateTime();
-		uint32_t lag   = (uint32_t)SUBZ(newdt, dt);
-		uint32_t diff  = (uint32_t)SUBZ(dt, newdt);
+		uint32_t lag   = (uint32_t)SUBZ(newdt, dt), diff;
 
-		if (lag >= 2000) Log("Lagging by %ums", lag);
+		if (lag >= (2 * delay)) {
+			Log(0, "Lag:%ums", lag);
+		}
 
+		SetStat("lag", lag);
+
+		newdt = (uint64_t)ADateTime();
+		diff  = (uint32_t)SUBZ(dt, newdt);
 		if (diff) Sleep(diff);
-
-		dt = (uint64_t)ADateTime();
 
 		if (cmd.Valid()) Process(dt);
 
@@ -856,7 +857,7 @@ void *ImageDiffer::Run()
 		uint_t newsettingscount = settingschangecount;
 		if (newsettingscount != settingschange) {
 			settingschange = newsettingscount;
-			Log("Re-configuring");
+			Log(0, "Re-configuring");
 			Configure();
 
 			dt = (uint64_t)ADateTime();

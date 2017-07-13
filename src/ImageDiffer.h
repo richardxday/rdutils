@@ -76,8 +76,8 @@ protected:
 
 	virtual void *Run();
 
-	void Log(const char *fmt, ...);
-	void Log(uint_t index, const char *fmt, va_list ap);
+	void Log(uint_t level, const char *fmt, ...);
+	void Log(uint_t level, const char *fmt, va_list ap);
 
 	class ProtectedSettings {
 	public:
