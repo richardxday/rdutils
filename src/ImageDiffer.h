@@ -30,6 +30,8 @@ public:
 protected:
 	typedef struct {
 		AString	  filename;
+		AString	  savedetfilename;
+		AString	  savefilename;
 		AImage	  image;
 		AImage	  detimage;
 		ARect	  rect;
@@ -61,8 +63,8 @@ protected:
 	void CalcLevel(IMAGE *img2, double avg, double sd, std::vector<double>& difference);
 	void CreateDetectionImage(const IMAGE *img1, IMAGE *img2, const std::vector<double>& difference);
 
-	bool SettingExists(const AString& name);
-	AString GetSetting(const AString& name, const AString& defval = "");
+	bool SettingExists(const AString& name) const;
+	AString GetSetting(const AString& name, const AString& defval = "") const;
 	void CheckSettingsUpdate();
 
 	double  GetStat(const AString& name);
@@ -79,6 +81,8 @@ protected:
 	void Log(uint_t level, const char *fmt, ...);
 	void Log(uint_t level, const char *fmt, va_list ap);
 
+	AString FindFile(const AString& filename) const;
+	
 	class ProtectedSettings {
 	public:
 		ProtectedSettings(const AString& name, bool inhomedir = true, uint32_t iwritedelay = ~0) : settings(name, inhomedir, iwritedelay) {}

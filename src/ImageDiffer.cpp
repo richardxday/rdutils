@@ -84,7 +84,7 @@ ImageDiffer::ProtectedSettings& ImageDiffer::GetSettings()
 	return _settings;
 }
 
-bool ImageDiffer::SettingExists(const AString& name)
+bool ImageDiffer::SettingExists(const AString& name) const
 {
 	ProtectedSettings& _settings = GetSettings();
 	AThreadLock		   lock(_settings);
@@ -93,7 +93,7 @@ bool ImageDiffer::SettingExists(const AString& name)
 	return (settings.Exists(name + suffix) || settings.Exists(name));
 }
 
-AString ImageDiffer::GetSetting(const AString& name, const AString& defval)
+AString ImageDiffer::GetSetting(const AString& name, const AString& defval) const
 {
 	ProtectedSettings& _settings = GetSettings();
 	AThreadLock		   lock(_settings);
@@ -194,6 +194,29 @@ AString ImageDiffer::CreateCaptureCommand()
 	return cmd;
 }
 
+AString ImageDiffer::FindFile(const AString& filename) const
+{
+	if (AStdFile::exists(filename)) return filename;
+	
+	AString dirs = GetSetting("filedirs", "");
+	if (dirs.Valid()) dirs += ";";
+	dirs += GetSettings().GetSettings().GetFilename().PathPart();
+
+	uint_t i, n = dirs.CountLines(";");
+	for (i = 0; i < n; i++) {
+		AString dir       = dirs.Line(i, ";");
+		AString filename2 = dir.CatPath(filename);
+
+		//debug("Looking for '%s' in '%s'\n", filename.str(), dir.str());
+		if (dir.Valid() && AStdFile::exists(filename2)) {
+			//debug("Found '%s' in '%s' as '%s'\n", filename.str(), dir.str(), filename2.str());
+			return filename2;	
+		}
+	}
+
+	return "";
+}
+
 void ImageDiffer::Configure()
 {
 	AString indexstr = AString("%").Arg(index);
@@ -278,22 +301,35 @@ void ImageDiffer::Configure()
 		maskimage.Delete();
 		filename = GetSetting("maskimage");
 		if (filename.Valid()) {
-			if (maskimage.Load(filename)) {
-				Log(0, "Loaded mask image '%s'", filename.str());
+			AString filename2;
+			if ((filename2 = FindFile(filename)).Valid()) {
+				if (maskimage.Load(filename2)) {
+					Log(0, "Loaded mask image '%s'", filename2.str());
+				}
+				else {
+					Log(0, "Failed to load mask image '%s'", filename2.str());
+				}
 			}
 			else {
-				Log(0, "Failed to load mask image '%s'", filename.str());
+				Log(0, "Failed to find mask image '%s'", filename.str());
 			}
 		}
 
 		gainimage.Delete();
 		filename = GetSetting("gainimage");
 		if (filename.Valid()) {
-			if (gainimage.Load(filename)) {
-				Log(0, "Loaded gain image '%s'", filename.str());
+			AString filename2;
+			
+			if ((filename2 = FindFile(filename)).Valid()) {
+				if (gainimage.Load(filename2)) {
+					Log(0, "Loaded gain image '%s'", filename2.str());
+				}
+				else {
+					Log(0, "Failed to load gain image '%s'", filename2.str());
+				}
 			}
 			else {
-				Log(0, "Failed to load gain image '%s'", filename.str());
+				Log(0, "Failed to find gain image '%s'", filename.str());
 			}
 		}
 		gaindata.resize(0);
@@ -780,15 +816,19 @@ void ImageDiffer::SaveImage(IMAGE *img)
 
 		// save detection image, if possible
 		if (detimgdir.Valid() && detimgfmt.Valid() && img->detimage.Valid()) {
-			AString filename = detimgdir.CatPath(dt.DateFormat(detimgfmt) + ".jpg");
+			AString& filename = img->savedetfilename;
+			filename = detimgdir.CatPath(dt.DateFormat(detimgfmt) + ".jpg");
 			CreateDirectory(filename.PathPart());
 			img->detimage.SaveJPEG(filename, tags);
 		}
 
 		// save main image
+		AString& filename = img->savefilename;
+		
+		filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
+		
+		AString   dir = filename.PathPart();
 		FILE_INFO info;
-		AString filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
-		AString dir      = filename.PathPart();
 		if (!GetFileInfo(dir, &info) && !CreateDirectory(dir)) {
 			Log(0, "Failed to create directory '%s'", dir.str());
 		}
@@ -815,7 +855,7 @@ void ImageDiffer::LogDetection(IMAGE *img)
 		if (fp.open(filename, "a")) {
 			if (!lastdetectionlogged) fp.printf("\n");
 						
-			fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le\n",
+			fp.printf("%s %u %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le %0.16le '%s' '%s'\n",
 					  /*  1,2 */ img->dt.DateFormat("%Y-%M-%D %h:%m:%s.%S").str(),
 					  /*  3 */ index,
 					  /*  4 */ img->avg,
@@ -828,7 +868,9 @@ void ImageDiffer::LogDetection(IMAGE *img)
 					  /* 11 */ img->level,
 					  /* 12 */ img->rawlevel,
 					  /* 13 */ threshold,
-					  /* 14 */ logthreshold);
+					  /* 14 */ logthreshold,
+					  /* 15 */ img->savefilename.str(),
+					  /* 16 */ img->savedetfilename.str());
 			fp.close();
 
 			lastdetectionlogged = true;
