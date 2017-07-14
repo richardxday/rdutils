@@ -123,8 +123,10 @@ protected:
 	AList					sourceimagelist;
 	bool				    readingfromimagelist;
 	std::vector<double>		gaindata;
-	double    			  	fastcoeff;
-	double    			  	slowcoeff;
+	double    			  	fastattcoeff;
+	double    			  	fastdeccoeff;
+	double    			  	slowattcoeff;
+	double    			  	slowdeccoeff;
 	double    			  	fastavg;
 	double    			  	fastsd;
 	double    			  	slowavg;

@@ -248,8 +248,10 @@ void ImageDiffer::Configure()
 	}
 	readingfromimagelist = (sourceimagelist.Count() > 0);
 
-	fastcoeff  	  = (double)GetSetting("fastcoeff", 	  "1.0e-1");
-	slowcoeff  	  = (double)GetSetting("slowcoeff", 	  "1.0e-3");
+	fastattcoeff  = (double)GetSetting("fastattcoeff", 	  "1.0e-1");
+	fastdeccoeff  = (double)GetSetting("fastdeccoeff", 	  "1.5e-1");
+	slowattcoeff  = (double)GetSetting("slowattcoeff", 	  "1.0e-2");
+	slowdeccoeff  = (double)GetSetting("slowdeccoeff", 	  "1.5e-2");
 	avgfactor 	  = (double)GetSetting("avgfactor", 	  "1.0");
 	sdfactor  	  = (double)GetSetting("sdfactor",  	  "2.0");
 	redscale  	  = (double)GetSetting("rscale",    	  "1.0");
@@ -644,11 +646,17 @@ void ImageDiffer::Process(const ADateTime& dt)
 				FindDifference(img1, img2, difference);
 
 				// filter values
-				Interpolate(fastavg, img2->avg, fastcoeff);
-				Interpolate(fastsd,  img2->sd,  fastcoeff);
-				Interpolate(slowavg, img2->avg, slowcoeff);
-				Interpolate(slowsd,  img2->sd,  slowcoeff);
-
+				if (img2->avg >= fastavg) fastavg += (img2->avg - fastavg) * fastattcoeff;
+				else					  fastavg += (img2->avg - fastavg) * fastdeccoeff;
+				if (img2->sd  >= fastsd)  fastsd  += (img2->sd 	- fastsd) * fastattcoeff;
+				else					  fastsd  += (img2->sd 	- fastsd) * fastdeccoeff;
+				if (img2->avg >= slowavg) slowavg += (img2->avg - slowavg) * slowattcoeff;
+				else					  slowavg += (img2->avg - slowavg) * slowdeccoeff;
+				if (img2->sd  >= slowsd)  slowsd  += (img2->sd 	- slowsd) * slowattcoeff;
+				else					  slowsd  += (img2->sd 	- slowsd) * slowdeccoeff;
+				slowavg = std::min(slowavg, fastavg);
+				slowsd  = std::min(slowsd,  fastsd);
+				
 				img2->fastavg = fastavg;
 				img2->fastsd  = fastsd;
 				img2->slowavg = slowavg;
