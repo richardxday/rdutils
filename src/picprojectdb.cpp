@@ -97,11 +97,12 @@ bool CopyFile(const AString& src, const AString& dst, bool binary = true)
 }
 
 typedef struct {
-	AString name;
-	AString path;
-	AString relpath;
-	AString backuppath;
-	bool    deleted;
+	AString   name;
+	AString   path;
+	AString   relpath;
+	AString   backuppath;
+	bool      deleted;
+	FILE_INFO info;
 } SOURCE;
 
 int main(int argc, char *argv[])
@@ -161,7 +162,7 @@ int main(int argc, char *argv[])
 						item.deleted = line.Column(columnnametoindex["MemberIDs"]).Valid();
 
 						if (item.path.StartsWithNoCase(rootpath)) {
-							if (item.deleted || AStdFile::exists(ConvertPath(item.path))) {
+							if (item.deleted || GetFileInfo(ConvertPath(item.path), &item.info)) {
 								item.relpath    = item.path.Mid(rootpath.len());
 								item.backuppath = backuppath.CatPath(item.relpath);
 								
@@ -178,14 +179,21 @@ int main(int argc, char *argv[])
 					uint_t pc = ~0;
 					for (i = n = 0; i < (uint_t)files.size(); i++) {
 						const SOURCE& item = files[i];
+						FILE_INFO info;
 						
-						if (!item.deleted && !AStdFile::exists(ConvertPath(item.backuppath))) {
+						if (!item.deleted &&
+							(!GetFileInfo(ConvertPath(item.backuppath), &info) ||
+							 (info.FileSize != item.info.FileSize))) {
 							printf("\r%s -> %s", item.path.str(), item.backuppath.str());
 							fflush(stdout);
 
-							CreateDirectory(ConvertPath(item.path).PathPart());
-							CopyFile(ConvertPath(item.path), ConvertPath(item.backuppath));
-							printf("\r%s -> %s ... done\n", item.path.str(), item.backuppath.str());
+							AString dir = item.path.PathPart();
+							if (!CreateDirectory(ConvertPath(dir))) {
+								fprintf(stderr, "Failed to create directory '%s'\n", dir.str());
+							}
+							
+							bool success = CopyFile(ConvertPath(item.path), ConvertPath(item.backuppath));
+							printf("\r%s -> %s ... %s\n", item.path.str(), item.backuppath.str(), success ? "done" : "**ERROR**");
 
 							n++;
 
