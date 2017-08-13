@@ -10,6 +10,7 @@
 
 #include <rdlib/StdFile.h>
 #include <rdlib/strsup.h>
+#include <rdlib/Recurse.h>
 
 class TempFile
 {
@@ -95,6 +96,14 @@ bool CopyFile(const AString& src, const AString& dst, bool binary = true)
 	return success;
 }
 
+typedef struct {
+	AString name;
+	AString path;
+	AString relpath;
+	AString backuppath;
+	bool    deleted;
+} SOURCE;
+
 int main(int argc, char *argv[])
 {
 	AString dbdir;
@@ -121,10 +130,11 @@ int main(int argc, char *argv[])
 		fp.printf("select Name,Path,MemberIDs from SourceTable\n");
 		fp.close();
 
-		cmd.printf("mdb-sql -i %s -o %s -p -d ',' -F %s",
+		cmd.printf("mdb-sql -i %s -p -d ',' -F %s >%s",
 				   cmdfile.str(),
-				   resultsfile.str(),
-				   dbdir.CatPath("Source.mdb").str());
+				   dbdir.CatPath("Source.mdb").str(),
+				   resultsfile.str());
+				   
 		if (system(cmd) == 0) {
 			if (fp.open(resultsfile)) {
 				std::map<AString,uint_t> columnnametoindex;
@@ -132,21 +142,15 @@ int main(int argc, char *argv[])
 				AString line;
 				uint_t i, n;
 
-				if (line.ReadLn(fp) >= 0) {
-					n = line.CountColumns();
+				while ((line.ReadLn(fp) >= 0) && line.Empty()) ;
 
+				n = line.CountColumns();
+				if (n > 0) {
 					for (i = 0; i < n; i++) {
 						columnnametoindex[line.Column(i)] = i;
 						columnindextoname[i] = line.Column(i);
 					}
 
-					typedef struct {
-						AString name;
-						AString path;
-						AString relpath;
-						AString backuppath;
-						bool    deleted;
-					} SOURCE;
 					std::vector<SOURCE> files;
 					uint_t nbackup = 0;
 					while (line.ReadLn(fp) >= 0) {
@@ -157,7 +161,7 @@ int main(int argc, char *argv[])
 						item.deleted = line.Column(columnnametoindex["MemberIDs"]).Valid();
 
 						if (item.path.StartsWithNoCase(rootpath)) {
-							if (AStdFile::exists(ConvertPath(item.path))) {
+							if (item.deleted || AStdFile::exists(ConvertPath(item.path))) {
 								item.relpath    = item.path.Mid(rootpath.len());
 								item.backuppath = backuppath.CatPath(item.relpath);
 								
@@ -172,22 +176,25 @@ int main(int argc, char *argv[])
 					printf("%u files found (%u to backup)\n", (uint_t)files.size(), nbackup);
 
 					uint_t pc = ~0;
-					for (i = 0; i < (uint_t)files.size(); i++) {
+					for (i = n = 0; i < (uint_t)files.size(); i++) {
 						const SOURCE& item = files[i];
 						
 						if (!item.deleted && !AStdFile::exists(ConvertPath(item.backuppath))) {
 							printf("\r%s -> %s", item.path.str(), item.backuppath.str());
 							fflush(stdout);
-							
+
+							CreateDirectory(ConvertPath(item.path).PathPart());
 							CopyFile(ConvertPath(item.path), ConvertPath(item.backuppath));
 							printf("\r%s -> %s ... done\n", item.path.str(), item.backuppath.str());
-						}
 
-						uint_t pc1 = ((i + 1) * 100) / (uint_t)files.size();
-						if (pc1 != pc) {
-							pc = pc1;
-							printf("\r%u of %u done - %u%%", i, (uint_t)files.size(), pc);
-							fflush(stdout);
+							n++;
+
+							uint_t pc1 = (n * 100) / nbackup;
+							if (pc1 != pc) {
+								pc = pc1;
+								printf("\rProcessed %u of %u (%u%%) done", n, nbackup, pc);
+								fflush(stdout);
+							}
 						}
 					}
 
@@ -196,6 +203,7 @@ int main(int argc, char *argv[])
 				
 				fp.close();
 			}
+			else fprintf(stderr, "Failed to open results file '%s'\n", resultsfile.str());
 		}
 		else fprintf(stderr, "Command '%s' failed\n", cmd.str());
 	}
