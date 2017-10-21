@@ -41,18 +41,20 @@ OBJECTS      := $(APPLICATION:%=%.o) ImageDiffer.o
 include $(MAKEFILEDIR)/makefile.app
 
 APPLICATION  := srttracker
-LOCAL_CFLAGS += -I$(APPLICATION)
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
 APPLICATION  := sqlloganalyzer
-LOCAL_CFLAGS += -I$(APPLICATION)
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
 EXTRA_LIBS   := $(call staticlib,$(EXTRA_LIBS),rdlib)
 
 APPLICATION  := picprojectdb
+OBJECTS      := $(APPLICATION:%=%.o)
+include $(MAKEFILEDIR)/makefile.app
+
+APPLICATION  := accounts
 LOCAL_CFLAGS += -I$(APPLICATION)
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
