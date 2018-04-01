@@ -58,9 +58,9 @@ LOCAL_CFLAGS += -I$(APPLICATION)
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION  := userdicgenerator
-OBJECTS      := $(APPLICATION:%=%.o)
-include $(MAKEFILEDIR)/makefile.app
+# APPLICATION  := userdicgenerator
+# OBJECTS      := $(APPLICATION:%=%.o)
+# include $(MAKEFILEDIR)/makefile.app
 
 EXTRA_LIBS   := $(call staticlib,$(EXTRA_LIBS),rdlib)
 
