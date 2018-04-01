@@ -5,6 +5,11 @@ MAKEFILEDIR = /usr/local/share/rdlib-0.1/makefiles
 
 include $(MAKEFILEDIR)/makefile.init
 
+APPLICATION  := etagswrapper
+LOCAL_CFLAGS += -I$(APPLICATION)
+OBJECTS      := $(APPLICATION:%=%.o)
+include $(MAKEFILEDIR)/makefile.app
+
 EXTRA_CFLAGS += $(call pkgcflags,rdlib-0.1)
 EXTRA_LIBS   += $(call pkglibs,rdlib-0.1)
 
@@ -48,14 +53,18 @@ APPLICATION  := sqlloganalyzer
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-EXTRA_LIBS   := $(call staticlib,$(EXTRA_LIBS),rdlib)
-
-APPLICATION  := picprojectdb
+APPLICATION  := accounts
+LOCAL_CFLAGS += -I$(APPLICATION)
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION  := accounts
-LOCAL_CFLAGS += -I$(APPLICATION)
+APPLICATION  := userdicgenerator
+OBJECTS      := $(APPLICATION:%=%.o)
+include $(MAKEFILEDIR)/makefile.app
+
+EXTRA_LIBS   := $(call staticlib,$(EXTRA_LIBS),rdlib)
+
+APPLICATION  := picprojectdb
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 

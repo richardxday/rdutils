@@ -38,11 +38,6 @@ typedef struct {
 	AString label;
 } filter_t;
 
-static bool sortbydate(const transaction_t& a, const transaction_t& b)
-{
-	return (a.date < b.date);
-}
-
 static bool sortbytotal(const transactionlist_t *a, const transactionlist_t *b)
 {
 	return (llabs(a->total) > llabs(b->total));
@@ -69,42 +64,45 @@ int main(int argc, char *argv[])
 			"Subcategory",
 			"Memo",
 		};
+		static const AString  anyregex      = ParseRegex("*");
 		static const AString  directdeposit = ParseRegex("directdep");
 		static const AString  directdebit   = ParseRegex("(directdebit)|(repeatpmt)");
 		static const AString  payment       = ParseRegex("payment");
 		static const AString  fundstransfer = ParseRegex("ft");
 		static const AString  cash          = ParseRegex("cash");
 		static const filter_t filters[] = {
-			{true,  true,  false, directdeposit,		  ParseRegex("bbc monthly*"),			"Salary"},
-			{true,  true,  false, directdeposit,		  ParseRegex("mt safeline*"),			"Salary"},
-			{true,  true,  false, directdeposit,		  ParseRegex("*edmondson*"),			"Gail"},
-			{true,  true,  true,  directdeposit,		  ParseRegex("*bbc*"),					"BBC Expenses"},
-			{true,  true,  true,  directdeposit,		  ParseRegex("*"),						""},
+			{false,  true,  false, anyregex,			  anyregex,								"Outgoings"},
+			
+			{ true,  true,  false, directdeposit,		  ParseRegex("bbc monthly*"),			"Salary"},
+			{ true,  true,  false, directdeposit,		  ParseRegex("mt safeline*"),			"Salary"},
+			{ true,  true,  false, directdeposit,		  ParseRegex("*edmondson*"),			"Gail"},
+			{ true,  true,  true,  directdeposit,		  ParseRegex("*bbc*"),					"BBC Expenses"},
+			{ true,  true,  true,  directdeposit,		  ParseRegex("*"),						""},
 
-			{true,  true,  false, directdebit,			  ParseRegex("*"),						"Bills"},
-			{true,  true,  false, directdebit,			  ParseRegex("*"),						""},
+			{ true,  true,  false, directdebit,			  ParseRegex("*"),						"Bills"},
+			{ true,  true,  false, directdebit,			  ParseRegex("*"),						""},
 
-			{true,  true,  false, payment,				  ParseRegex("nowtv.com*"),				"Bills"},
-			{true,  true,  false, payment,				  ParseRegex("nowtv.com*"),				"NOW TV"},
-			{true,  true,  false, payment,				  ParseRegex("google*"),				"Google"},
+			{ true,  true,  false, payment,				  ParseRegex("nowtv.com*"),				"Bills"},
+			{ true,  true,  false, payment,				  ParseRegex("nowtv.com*"),				"NOW TV"},
+			{ true,  true,  false, payment,				  ParseRegex("google*"),				"Google"},
 
-			{true,  true,  false, payment,				  ParseRegex("*peel media*"),			"Bills"},
+			{ true,  true,  false, payment,				  ParseRegex("*peel media*"),			"Bills"},
 
-			{true,  true,  false, fundstransfer,		  ParseRegex("*83111512*"),				"Mortgate Transfers"},
+			{ true,  true,  false, fundstransfer,		  ParseRegex("*83111512*"),				"Mortgate Transfers"},
 
-			{true,  true,  false, cash,					  ParseRegex("*"),						"Cash"},
+			{ true,  true,  false, cash,				  ParseRegex("*"),						"Cash"},
 
-			{true,  true,  false, payment,				  ParseRegex("*amazon*"),				"Amazon"},
-			{true,  true,  false, payment,				  ParseRegex("*paypal*"),				"PayPal"},
-			{true,  true,  false, payment,				  ParseRegex("*tesco*"),				"Tesco"},
-			{true,  true,  false, payment,				  ParseRegex("*asda*"),				    "Asda"},
-			{true,  true,  false, payment,				  ParseRegex("*sainsburys*"),			"Sainsburys"},
-			{true,  true,  false, payment,				  ParseRegex("*santaspizza*"),			"Santas"},
-			{true,  true,  false, payment,				  ParseRegex("*mcdonalds*"),			"McDonalds"},
-			{true,  true,  false, payment,				  ParseRegex("*kwik fit*"),				"Kwik Fit"},
+			{ true,  true,  false, payment,				  ParseRegex("*amazon*"),				"Amazon"},
+			{ true,  true,  false, payment,				  ParseRegex("*paypal*"),				"PayPal"},
+			{ true,  true,  false, payment,				  ParseRegex("*tesco*"),				"Tesco"},
+			{ true,  true,  false, payment,				  ParseRegex("*asda*"),				    "Asda"},
+			{ true,  true,  false, payment,				  ParseRegex("*sainsburys*"),			"Sainsburys"},
+			{ true,  true,  false, payment,				  ParseRegex("*santaspizza*"),			"Santas"},
+			{ true,  true,  false, payment,				  ParseRegex("*mcdonalds*"),			"McDonalds"},
+			{ true,  true,  false, payment,				  ParseRegex("*kwik fit*"),				"Kwik Fit"},
 
-			{false, true,  true,  ParseRegex("*"),		  ParseRegex("*"),						"Other Payments"},
-			{true,  false, true,  ParseRegex("*"),		  ParseRegex("*"),						"Other Receipts"},
+			{false,  true,  true,  ParseRegex("*"),		  ParseRegex("*"),						"Other Payments"},
+			{ true, false,  true,  ParseRegex("*"),		  ParseRegex("*"),						"Other Receipts"},
 		};
 		std::vector<AString>       columnlist;
 		std::map<AString,size_t>   columnmap;
@@ -156,15 +154,13 @@ int main(int argc, char *argv[])
 				}
 				trans.desclines.push_back(trans.desc.Mid(p1).Words(0));
 				
-				transactions.push_back(trans);
+				transactions.insert(transactions.begin(), trans);
 			}
 
 			ln++;
 		}
 		
 		fp.close();
-
-		std::sort(transactions.begin(), transactions.end(), sortbydate);
 
 		months.push_back(0);
 		
@@ -221,6 +217,12 @@ int main(int argc, char *argv[])
 						count++;
 					}
 				}
+
+				if (count == 0) {
+					fprintf(stderr, "Warning: transaction at %s, '%s' as not accumulated\n",
+							trans.date.DateFormat("%D/%M/%Y").str(),
+							trans.desclines[0].str());
+				}
 			}
 		}
 		
@@ -235,6 +237,7 @@ int main(int argc, char *argv[])
 
 			std::sort(list.begin(), list.end(), sortbytotal);
 
+#if 0
 			for (i = 0; i < list.size(); i++) {
 				const transactionlist_t& labellist = *list[i];
 
@@ -246,7 +249,8 @@ int main(int argc, char *argv[])
 						   (double)labellist.total * .01 / (double)labellist.count);
 				}
 			}
-
+#endif
+			
 			if (fp.open("results.csv", "w")) {
 				fp.printf("Month");
 
@@ -288,6 +292,40 @@ int main(int argc, char *argv[])
 
 					fp.printf("\n");
 				}
+
+				fp.close();
+			}
+
+			if (fp.open("results.dat", "w")) {
+				const ADateTime startdt = ADateTime().StrToDate("1/4/2016");
+				ADateTime monthdt;
+				uint32_t lastmonth = ~0;
+				int32_t  total = 0, monthtotal = 0;
+				
+				for (i = 0; i < transactions.size(); i++) {
+					const transaction_t& trans = transactions[i];
+
+					if (trans.month != lastmonth) {
+						fp.printf("\n");
+						monthdt   = trans.date;
+						lastmonth = trans.month;
+						monthtotal = 0;
+					}
+
+					total += trans.amount;
+					monthtotal += trans.amount;
+
+					if (monthdt >= startdt) {
+						fp.printf("%s %u %0.2f %0.2f %0.2f\n",
+								  monthdt.DateFormat("%D/%M/%Y").str(),
+								  trans.date.GetDays() - monthdt.GetDays(),
+								  (double)trans.amount * .01,
+								  (double)total * .01,
+								  (double)monthtotal * .01);
+					}
+				}
+				
+				fp.close();				
 			}
 		}
 	}
