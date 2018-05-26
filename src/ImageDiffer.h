@@ -45,6 +45,7 @@ protected:
 		double    fastsd;
 		double	  slowavg;
 		double	  slowsd;
+		uint_t    imagenumber;
 		bool	  saved;
 		bool	  logged;
 	} IMAGE;
@@ -67,8 +68,12 @@ protected:
 	AString GetSetting(const AString& name, const AString& defval = "") const;
 	void CheckSettingsUpdate();
 
-	double  GetStat(const AString& name);
+	AString GetStat(const AString& name);
+	template<typename T>
+	void    GetStat(const AString& name, T& val) {val = (T)GetStat(name);}
+
 	void    SetStat(const AString& name, double val);
+	void    SetStat(const AString& name, uint_t val);
 	
 	void Configure();
 
@@ -156,6 +161,9 @@ protected:
 	uint_t				    verbose;
 	uint_t					verbose2;
 	uint_t					timeout;
+	uint_t					imagenumber;
+	uint_t					savedimagenumber;
+	uint_t					seqno;
 	bool					logdetections;
 	bool					lastdetectionlogged;
 	

@@ -19,14 +19,17 @@ ImageDiffer::ImageDiffer(uint_t _index) :
 	index(_index),
 	settingschange(settingschangecount),
 	verbose(0),
+	imagenumber(0),
+	savedimagenumber(0),
+	seqno(0),
 	lastdetectionlogged(false)
 {
 	imglist.SetDestructor(&__DeleteImage);
 
-	fastavg = GetStat("fastavg");
-	fastsd  = GetStat("fastsd");
-	slowavg = GetStat("slowavg");
-	slowsd  = GetStat("slowsd");
+	GetStat("fastavg", fastavg);
+	GetStat("fastsd", fastsd);
+	GetStat("slowavg", slowavg);
+	GetStat("slowsd", slowsd);
 
 	Configure();
 
@@ -147,14 +150,14 @@ ImageDiffer::ProtectedSettings& ImageDiffer::GetStats()
 	return _stats;
 }
 
-double ImageDiffer::GetStat(const AString& name)
+AString ImageDiffer::GetStat(const AString& name)
 {
 	ProtectedSettings& _stats = GetStats();
 	AThreadLock		   lock(_stats);
 	ASettingsHandler&  stats  = _stats.GetSettings();
 	AString			   suffix = AString(":%").Arg(index);
 
-	return (double)stats.Get(name + suffix);
+	return stats.Get(name + suffix);
 }
 
 void ImageDiffer::SetStat(const AString& name, double val)
@@ -165,6 +168,16 @@ void ImageDiffer::SetStat(const AString& name, double val)
 	AString			   suffix = AString(":%").Arg(index);
 
 	stats.Set(name + suffix, AString("%0.16e").Arg(val));
+}
+
+void ImageDiffer::SetStat(const AString& name, uint_t val)
+{
+	ProtectedSettings& _stats = GetStats();
+	AThreadLock		   lock(_stats);
+	ASettingsHandler&  stats  = _stats.GetSettings();
+	AString			   suffix = AString(":%").Arg(index);
+
+	stats.Set(name + suffix, AString("%").Arg(val));
 }
 
 AString ImageDiffer::CreateWGetCommand(const AString& url)
@@ -233,27 +246,27 @@ void ImageDiffer::Configure()
 	streamerargs  = GetSetting("streamerargs", "-s 640x480");
 	capturecmd    = GetSetting("capturecmd").DeEscapify();
 	tempfile  	  = (GetSetting("tempfile", AString("/home/%/temp-{index}.jpeg").Arg(getenv("LOGNAME"))).
-				  	SearchAndReplace("{index}", indexstr));
+					 SearchAndReplace("{index}", indexstr));
 	imagedir  	  = (GetSetting("imagedir", "/media/cctv").
-				  	SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
-				  	SearchAndReplace("{index}",     indexstr));
-	imagefmt  	  = (GetSetting("filename", "%Y-%M-%D-{name}/%h/Image-%Y-%M-%D-%h-%m-%s-%S").
-				  	SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
-				  	SearchAndReplace("{index}",     indexstr));
+					 SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
+					 SearchAndReplace("{index}",     indexstr));
+	imagefmt  	  = (GetSetting("filename", "%Y-%M-%D-{name}/%h/Image-%Y-%M-%D-%h-%m-%s-%S-seq{seq}").
+					 SearchAndReplace("{name}",      name.Valid() ? name : "{index}").
+					 SearchAndReplace("{index}",     indexstr));
 	detlogfmt 	  = (GetSetting("detlogfilename", "detection.dat").
-				  	SearchAndReplace("{imagepath}", imagefmt.PathPart()).
-				  	SearchAndReplace("{imagename}", imagefmt.FilePart()).
-				  	SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
-				  	SearchAndReplace("{index}", 	indexstr));
+					 SearchAndReplace("{imagepath}", imagefmt.PathPart()).
+					 SearchAndReplace("{imagename}", imagefmt.FilePart()).
+					 SearchAndReplace("{name}",  	 name.Valid() ? name : "{index}").
+					 SearchAndReplace("{index}", 	 indexstr));
 	detimgdir 	  = (GetSetting("detimagedir").
-				  	SearchAndReplace("{imagedir}",  imagedir).
-				  	SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
-				  	SearchAndReplace("{index}",     indexstr));
+					 SearchAndReplace("{imagedir}",  imagedir).
+					 SearchAndReplace("{name}",  	 name.Valid() ? name : "{index}").
+					 SearchAndReplace("{index}",     indexstr));
 	detimgfmt 	  = (GetSetting("detfilename", "{imagepath}/detection/{imagename}").
-				  	SearchAndReplace("{imagepath}", imagefmt.PathPart()).
-				  	SearchAndReplace("{imagename}", imagefmt.FilePart()).
-				  	SearchAndReplace("{name}",  	name.Valid() ? name : "{index}").
-				  	SearchAndReplace("{index}", 	indexstr));
+					 SearchAndReplace("{imagepath}", imagefmt.PathPart()).
+					 SearchAndReplace("{imagename}", imagefmt.FilePart()).
+					 SearchAndReplace("{name}",  	 name.Valid() ? name : "{index}").
+					 SearchAndReplace("{index}", 	 indexstr));
 	detcmd    	  = GetSetting("detcommand").SearchAndReplace("{index}", indexstr);
 	detstartcmd   = GetSetting("detstartcommand").SearchAndReplace("{index}", indexstr);
 	detendcmd     = GetSetting("detendcommand").SearchAndReplace("{index}", indexstr);
@@ -285,6 +298,8 @@ void ImageDiffer::Configure()
 	threshold 	  = (double)GetSetting("threshold", 	  "3000.0");
 	logthreshold  = (double)GetSetting("logthreshold", "{threshold}").SearchAndReplace("{threshold}", GetSetting("threshold", "3000.0"));
 
+	GetStat("seqno", seqno);
+	
 	Log(0, "Destination '%s'", imagedir.CatPath(imagefmt).str());
 	if (detimgdir.Valid()) Log(0, "Detection files destination '%s'", detimgdir.CatPath(detimgfmt).str());
 	if (detlogfmt.Valid()) Log(0, "Detection log '%s' with threshold %0.1lf", imagedir.CatPath(detlogfmt).str(), logthreshold);
@@ -403,13 +418,14 @@ ImageDiffer::IMAGE *ImageDiffer::CreateImage(const char *filename, const IMAGE *
 
 		if (ReadJPEGInfo(filename, info) && image.LoadJPEG(filename)) {
 			// apply mask immediately
-			image *= maskimage;
+			image            *= maskimage;
 
-			img->filename = filename;
-			img->rect     = image.GetRect();
-			img->saved    = false;
-			img->logged   = false;
-
+			img->filename     = filename;
+			img->rect         = image.GetRect();
+			img->saved        = false;
+			img->logged       = false;
+			img->imagenumber  = imagenumber++;
+			
 			if (!img0) {
 				Log(0, "New set of images size %dx%d", img->rect.w, img->rect.h);
 			}
@@ -813,22 +829,39 @@ void ImageDiffer::SaveImage(IMAGE *img)
 			{AImage::TAG_JPEG_QUALITY, 95},
 			{TAG_DONE, 0},
 		};
+		FILE_INFO info;
 
+		// detect if any images *haven't* been saved
+		if ((img->imagenumber - savedimagenumber) > 1) {
+			// images not saved -> increment sequence number
+			seqno = (seqno + 1) % 1000000000;
+			SetStat("seqno", seqno);
+			Log(0, "New sequence %09u", seqno);
+		}
+
+		// generate sequence number string for filenames
+		AString seqstr = AString("%09").Arg(seqno);
+		
 		// save detection image, if possible
 		if (detimgdir.Valid() && detimgfmt.Valid() && img->detimage.Valid()) {
 			AString& filename = img->savedetfilename;
-			filename = detimgdir.CatPath(dt.DateFormat(detimgfmt) + ".jpg");
-			CreateDirectory(filename.PathPart());
+			
+			filename = detimgdir.CatPath(dt.DateFormat(detimgfmt).SearchAndReplace("{seq}", seqstr) + ".jpg");
+
+			AString dir = filename.PathPart();
+			if (!GetFileInfo(dir, &info) && !CreateDirectory(dir)) {
+				Log(0, "Failed to create directory '%s'", dir.str());
+			}
+
 			img->detimage.SaveJPEG(filename, tags);
 		}
 
 		// save main image
 		AString& filename = img->savefilename;
 		
-		filename = imagedir.CatPath(dt.DateFormat(imagefmt) + ".jpg");
+		filename = imagedir.CatPath(dt.DateFormat(imagefmt).SearchAndReplace("{seq}", seqstr) + ".jpg");
 		
-		AString   dir = filename.PathPart();
-		FILE_INFO info;
+		AString dir = filename.PathPart();
 		if (!GetFileInfo(dir, &info) && !CreateDirectory(dir)) {
 			Log(0, "Failed to create directory '%s'", dir.str());
 		}
@@ -840,6 +873,9 @@ void ImageDiffer::SaveImage(IMAGE *img)
 
 		// mark as saved
 		img->saved = true;
+
+		// update last saved image number
+		savedimagenumber = img->imagenumber;
 	}
 }
 
