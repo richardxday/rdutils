@@ -58,6 +58,11 @@ LOCAL_CFLAGS += -I$(APPLICATION)
 OBJECTS      := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
+APPLICATION  := countsmswords
+LOCAL_CFLAGS += -I$(APPLICATION)
+OBJECTS      := $(APPLICATION:%=%.o)
+include $(MAKEFILEDIR)/makefile.app
+
 # APPLICATION  := userdicgenerator
 # OBJECTS      := $(APPLICATION:%=%.o)
 # include $(MAKEFILEDIR)/makefile.app
