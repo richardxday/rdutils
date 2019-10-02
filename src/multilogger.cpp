@@ -34,10 +34,10 @@ int main(int argc, const char *argv[])
 				fprintf(stderr, "Failed to open file '%s' for writing\n", filename.str());
 				break;
 			}
-
-			fp.printf("%s: %s\n", dt.DateFormat("%h:%m:%s").str(), str.str());
-			fp.flush();
 		}
+
+		fp.printf("%s: %s\n", dt.DateFormat("%h:%m:%s").str(), str.str());
+		fp.flush();
 	}
 
 	fp.close();
