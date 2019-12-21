@@ -13,322 +13,322 @@
 #include <rdlib/Regex.h>
 
 typedef struct {
-	ADateTime date;
-	AString   account;
-	int64_t   amount;
-	AString   type;
-	AString   desc;
-	uint32_t  month;
-	std::vector<AString> desclines;
+    ADateTime date;
+    AString   account;
+    int64_t   amount;
+    AString   type;
+    AString   desc;
+    uint32_t  month;
+    std::vector<AString> desclines;
 } transaction_t;
 
 typedef struct {
-	AString  label;
-	uint32_t count;
-	int64_t  total;
-	std::vector<size_t> list;
+    AString  label;
+    uint32_t count;
+    int64_t  total;
+    std::vector<size_t> list;
 } transactionlist_t;
 
 typedef struct {
-	bool 	allowpositive;
-	bool 	allownegative;
-	bool    unused;
-	AString type;
-	AString desc;
-	AString label;
+    bool    allowpositive;
+    bool    allownegative;
+    bool    unused;
+    AString type;
+    AString desc;
+    AString label;
 } filter_t;
 
 static bool sortbytotal(const transactionlist_t *a, const transactionlist_t *b)
 {
-	return (llabs(a->total) > llabs(b->total));
+    return (llabs(a->total) > llabs(b->total));
 }
 
 void GetColumns(const AString& str, std::vector<AString>& columns)
 {
-	uint_t i, n = str.CountColumns();
+    uint_t i, n = str.CountColumns();
 
-	for (i = 0; i < n; i++) {
-		columns.push_back(str.Column(i).Words(0));
-	}
+    for (i = 0; i < n; i++) {
+        columns.push_back(str.Column(i).Words(0));
+    }
 }
 
 int main(int argc, char *argv[])
 {
-	AStdFile fp;
+    AStdFile fp;
 
-	if ((argc > 1) && fp.open(argv[1])) {
-		static const AString requiredcolumns[] = {
-			"Date",
-			"Account",
-			"Amount",
-			"Subcategory",
-			"Memo",
-		};
-		static const AString  anyregex      = ParseRegex("*");
-		static const AString  directdeposit = ParseRegex("directdep");
-		static const AString  directdebit   = ParseRegex("(directdebit)|(repeatpmt)");
-		static const AString  payment       = ParseRegex("payment");
-		static const AString  fundstransfer = ParseRegex("ft");
-		static const AString  cash          = ParseRegex("cash");
-		static const filter_t filters[] = {
-			{false,  true,  false, anyregex,			  anyregex,								"Outgoings"},
-			
-			{ true,  true,  false, directdeposit,		  ParseRegex("bbc monthly*"),			"Salary"},
-			{ true,  true,  false, directdeposit,		  ParseRegex("mt safeline*"),			"Salary"},
-			{ true,  true,  false, directdeposit,		  ParseRegex("*edmondson*"),			"Gail"},
-			{ true,  true,  true,  directdeposit,		  ParseRegex("*bbc*"),					"BBC Expenses"},
-			{ true,  true,  true,  directdeposit,		  ParseRegex("*"),						""},
+    if ((argc > 1) && fp.open(argv[1])) {
+        static const AString requiredcolumns[] = {
+            "Date",
+            "Account",
+            "Amount",
+            "Subcategory",
+            "Memo",
+        };
+        static const AString  anyregex      = ParseRegex("*");
+        static const AString  directdeposit = ParseRegex("directdep");
+        static const AString  directdebit   = ParseRegex("(directdebit)|(repeatpmt)");
+        static const AString  payment       = ParseRegex("payment");
+        static const AString  fundstransfer = ParseRegex("ft");
+        static const AString  cash          = ParseRegex("cash");
+        static const filter_t filters[] = {
+            {false,  true,  false, anyregex,              anyregex,                             "Outgoings"},
 
-			{ true,  true,  false, directdebit,			  ParseRegex("*"),						"Bills"},
-			{ true,  true,  false, directdebit,			  ParseRegex("*"),						""},
+            { true,  true,  false, directdeposit,         ParseRegex("bbc monthly*"),           "Salary"},
+            { true,  true,  false, directdeposit,         ParseRegex("mt safeline*"),           "Salary"},
+            { true,  true,  false, directdeposit,         ParseRegex("*edmondson*"),            "Gail"},
+            { true,  true,  true,  directdeposit,         ParseRegex("*bbc*"),                  "BBC Expenses"},
+            { true,  true,  true,  directdeposit,         ParseRegex("*"),                      ""},
 
-			{ true,  true,  false, payment,				  ParseRegex("nowtv.com*"),				"Bills"},
-			{ true,  true,  false, payment,				  ParseRegex("nowtv.com*"),				"NOW TV"},
-			{ true,  true,  false, payment,				  ParseRegex("google*"),				"Google"},
+            { true,  true,  false, directdebit,           ParseRegex("*"),                      "Bills"},
+            { true,  true,  false, directdebit,           ParseRegex("*"),                      ""},
 
-			{ true,  true,  false, payment,				  ParseRegex("*peel media*"),			"Bills"},
+            { true,  true,  false, payment,               ParseRegex("nowtv.com*"),             "Bills"},
+            { true,  true,  false, payment,               ParseRegex("nowtv.com*"),             "NOW TV"},
+            { true,  true,  false, payment,               ParseRegex("google*"),                "Google"},
 
-			{ true,  true,  false, fundstransfer,		  ParseRegex("*83111512*"),				"Mortgate Transfers"},
+            { true,  true,  false, payment,               ParseRegex("*peel media*"),           "Bills"},
 
-			{ true,  true,  false, cash,				  ParseRegex("*"),						"Cash"},
+            { true,  true,  false, fundstransfer,         ParseRegex("*83111512*"),             "Mortgate Transfers"},
 
-			{ true,  true,  false, payment,				  ParseRegex("*amazon*"),				"Amazon"},
-			{ true,  true,  false, payment,				  ParseRegex("*paypal*"),				"PayPal"},
-			{ true,  true,  false, payment,				  ParseRegex("*tesco*"),				"Tesco"},
-			{ true,  true,  false, payment,				  ParseRegex("*asda*"),				    "Asda"},
-			{ true,  true,  false, payment,				  ParseRegex("*sainsburys*"),			"Sainsburys"},
-			{ true,  true,  false, payment,				  ParseRegex("*santaspizza*"),			"Santas"},
-			{ true,  true,  false, payment,				  ParseRegex("*mcdonalds*"),			"McDonalds"},
-			{ true,  true,  false, payment,				  ParseRegex("*kwik fit*"),				"Kwik Fit"},
+            { true,  true,  false, cash,                  ParseRegex("*"),                      "Cash"},
 
-			{false,  true,  true,  ParseRegex("*"),		  ParseRegex("*"),						"Other Payments"},
-			{ true, false,  true,  ParseRegex("*"),		  ParseRegex("*"),						"Other Receipts"},
-		};
-		std::vector<AString>       columnlist;
-		std::map<AString,size_t>   columnmap;
-		std::vector<transaction_t> transactions;
-		std::vector<size_t>		   months;
-		AString  line;
-		uint32_t month = 0;
-		uint32_t ln = 0;
-		size_t   i;
-				
-		while (line.ReadLn(fp) >= 0) {
-			std::vector<AString> columns;
-			size_t i;
+            { true,  true,  false, payment,               ParseRegex("*amazon*"),               "Amazon"},
+            { true,  true,  false, payment,               ParseRegex("*paypal*"),               "PayPal"},
+            { true,  true,  false, payment,               ParseRegex("*tesco*"),                "Tesco"},
+            { true,  true,  false, payment,               ParseRegex("*asda*"),                 "Asda"},
+            { true,  true,  false, payment,               ParseRegex("*sainsburys*"),           "Sainsburys"},
+            { true,  true,  false, payment,               ParseRegex("*santaspizza*"),          "Santas"},
+            { true,  true,  false, payment,               ParseRegex("*mcdonalds*"),            "McDonalds"},
+            { true,  true,  false, payment,               ParseRegex("*kwik fit*"),             "Kwik Fit"},
 
-			GetColumns(line, columns);
+            {false,  true,  true,  ParseRegex("*"),       ParseRegex("*"),                      "Other Payments"},
+            { true, false,  true,  ParseRegex("*"),       ParseRegex("*"),                      "Other Receipts"},
+        };
+        std::vector<AString>       columnlist;
+        std::map<AString,size_t>   columnmap;
+        std::vector<transaction_t> transactions;
+        std::vector<size_t>        months;
+        AString  line;
+        uint32_t month = 0;
+        uint32_t ln = 0;
+        size_t   i;
 
-			if (ln == 0) {				
-				columnlist = columns;
+        while (line.ReadLn(fp) >= 0) {
+            std::vector<AString> columns;
+            size_t i;
 
-				for (i = 0; i < columnlist.size(); i++) {
-					columnmap[columnlist[i]] = i;
-				}
+            GetColumns(line, columns);
 
-				for (i = 0; i < NUMBEROF(requiredcolumns); i++) {
-					if (columnmap.find(requiredcolumns[i]) == columnmap.end()) {
-						fprintf(stderr, "Required column '%s' missing\n", requiredcolumns[i].str());
-						break;
-					}
-				}
+            if (ln == 0) {
+                columnlist = columns;
 
-				if (i < NUMBEROF(requiredcolumns)) {
-					break;
-				}
-			}
-			else {
-				transaction_t trans;
-				size_t n = 0;
-				
-				trans.date.StrToDate(columns[columnmap[requiredcolumns[n++]]]);
-				trans.account = columns[columnmap[requiredcolumns[n++]]];
-				trans.amount  = (int64_t)((double)columns[columnmap[requiredcolumns[n++]]] * 100.0);
-				trans.type    = columns[columnmap[requiredcolumns[n++]]];
-				trans.desc    = columns[columnmap[requiredcolumns[n++]]];
-				int p, p1 = 0;
+                for (i = 0; i < columnlist.size(); i++) {
+                    columnmap[columnlist[i]] = i;
+                }
 
-				while ((p = trans.desc.Pos("   ", p1)) >= 0) {
-					trans.desclines.push_back(trans.desc.Mid(p1, p).Words(0));
-					p1 = p + 3;
-				}
-				trans.desclines.push_back(trans.desc.Mid(p1).Words(0));
-				
-				transactions.insert(transactions.begin(), trans);
-			}
+                for (i = 0; i < NUMBEROF(requiredcolumns); i++) {
+                    if (columnmap.find(requiredcolumns[i]) == columnmap.end()) {
+                        fprintf(stderr, "Required column '%s' missing\n", requiredcolumns[i].str());
+                        break;
+                    }
+                }
 
-			ln++;
-		}
-		
-		fp.close();
+                if (i < NUMBEROF(requiredcolumns)) {
+                    break;
+                }
+            }
+            else {
+                transaction_t trans;
+                size_t n = 0;
 
-		months.push_back(0);
-		
-		for (i = 0; i < transactions.size(); i++) {
-			transaction_t& trans = transactions[i];
-		
-			if (/*(trans.date.GetMonth() != transactions[months[months.size() - 1]].date.GetMonth()) &&*/
-				(trans.amount > 0) &&
-				((trans.desc.PosNoCase("bbc monthly") >= 0) ||
-				 (trans.desc.PosNoCase("mt safeline") >= 0))) {
-				//printf("New pay point at %s, transaction %u\n", trans.date.DateToStr().str(), (uint_t)i);
-				month++;
-				months.push_back(i);
-			}
+                trans.date.StrToDate(columns[columnmap[requiredcolumns[n++]]]);
+                trans.account = columns[columnmap[requiredcolumns[n++]]];
+                trans.amount  = (int64_t)((double)columns[columnmap[requiredcolumns[n++]]] * 100.0);
+                trans.type    = columns[columnmap[requiredcolumns[n++]]];
+                trans.desc    = columns[columnmap[requiredcolumns[n++]]];
+                int p, p1 = 0;
 
-			trans.month = month;
-		}
-		
-		if ((months.size() > 0) && (transactions.size() > months[months.size()-1])) {
-			months.push_back(transactions.size());
-		}
-		
-		printf("%u transactions found\n", (uint_t)transactions.size());
+                while ((p = trans.desc.Pos("   ", p1)) >= 0) {
+                    trans.desclines.push_back(trans.desc.Mid(p1, p).Words(0));
+                    p1 = p + 3;
+                }
+                trans.desclines.push_back(trans.desc.Mid(p1).Words(0));
 
-		std::map<AString,transactionlist_t> transtypes;
-		
-		{
-			size_t j;
+                transactions.insert(transactions.begin(), trans);
+            }
 
-			for (i = 0; i < transactions.size(); i++) {
-				std::map<AString, bool> addedtolabel;
-				const transaction_t& trans = transactions[i];
-				uint_t count = 0;
-				
-				for (j = 0; j < NUMBEROF(filters); j++) {
-					const filter_t& filter = filters[j];
-					AString label = filter.label.Valid() ? filter.label : trans.desclines[0];
-					
-					if (((filter.allowpositive && (trans.amount > 0)) ||
-						 (filter.allownegative && (trans.amount < 0))) &&
-						MatchRegex(trans.type, filter.type) &&
-						MatchRegex(trans.desc, filter.desc) &&
-						!addedtolabel[label] &&
-						(!count || !filter.unused)) {
-						transactionlist_t& list = transtypes[label];
-						
-						list.label = label;
-						list.count++;
-						list.total += trans.amount;
-						list.list.push_back(i);
-						
-						addedtolabel[label] = true;
+            ln++;
+        }
 
-						count++;
-					}
-				}
+        fp.close();
 
-				if (count == 0) {
-					fprintf(stderr, "Warning: transaction at %s, '%s' as not accumulated\n",
-							trans.date.DateFormat("%D/%M/%Y").str(),
-							trans.desclines[0].str());
-				}
-			}
-		}
-		
-		{
-			std::vector<const transactionlist_t *> list;
-			std::map<AString, transactionlist_t>::iterator it;
-			size_t j, k;
-			
-			for (it = transtypes.begin(); it != transtypes.end(); ++it) {
-				list.push_back(&it->second);
-			}
+        months.push_back(0);
 
-			std::sort(list.begin(), list.end(), sortbytotal);
+        for (i = 0; i < transactions.size(); i++) {
+            transaction_t& trans = transactions[i];
+
+            if (/*(trans.date.GetMonth() != transactions[months[months.size() - 1]].date.GetMonth()) &&*/
+                (trans.amount > 0) &&
+                ((trans.desc.PosNoCase("bbc monthly") >= 0) ||
+                 (trans.desc.PosNoCase("mt safeline") >= 0))) {
+                //printf("New pay point at %s, transaction %u\n", trans.date.DateToStr().str(), (uint_t)i);
+                month++;
+                months.push_back(i);
+            }
+
+            trans.month = month;
+        }
+
+        if ((months.size() > 0) && (transactions.size() > months[months.size()-1])) {
+            months.push_back(transactions.size());
+        }
+
+        printf("%u transactions found\n", (uint_t)transactions.size());
+
+        std::map<AString,transactionlist_t> transtypes;
+
+        {
+            size_t j;
+
+            for (i = 0; i < transactions.size(); i++) {
+                std::map<AString, bool> addedtolabel;
+                const transaction_t& trans = transactions[i];
+                uint_t count = 0;
+
+                for (j = 0; j < NUMBEROF(filters); j++) {
+                    const filter_t& filter = filters[j];
+                    AString label = filter.label.Valid() ? filter.label : trans.desclines[0];
+
+                    if (((filter.allowpositive && (trans.amount > 0)) ||
+                         (filter.allownegative && (trans.amount < 0))) &&
+                        MatchRegex(trans.type, filter.type) &&
+                        MatchRegex(trans.desc, filter.desc) &&
+                        !addedtolabel[label] &&
+                        (!count || !filter.unused)) {
+                        transactionlist_t& list = transtypes[label];
+
+                        list.label = label;
+                        list.count++;
+                        list.total += trans.amount;
+                        list.list.push_back(i);
+
+                        addedtolabel[label] = true;
+
+                        count++;
+                    }
+                }
+
+                if (count == 0) {
+                    fprintf(stderr, "Warning: transaction at %s, '%s' as not accumulated\n",
+                            trans.date.DateFormat("%D/%M/%Y").str(),
+                            trans.desclines[0].str());
+                }
+            }
+        }
+
+        {
+            std::vector<const transactionlist_t *> list;
+            std::map<AString, transactionlist_t>::iterator it;
+            size_t j, k;
+
+            for (it = transtypes.begin(); it != transtypes.end(); ++it) {
+                list.push_back(&it->second);
+            }
+
+            std::sort(list.begin(), list.end(), sortbytotal);
 
 #if 0
-			for (i = 0; i < list.size(); i++) {
-				const transactionlist_t& labellist = *list[i];
+            for (i = 0; i < list.size(); i++) {
+                const transactionlist_t& labellist = *list[i];
 
-				if (labellist.count > 0) {
-					printf("Label '%s' amount %0.2lf count %u average %0.2lf\n",
-						   labellist.label.str(),
-						   (double)labellist.total * .01,
-						   labellist.count,
-						   (double)labellist.total * .01 / (double)labellist.count);
-				}
-			}
+                if (labellist.count > 0) {
+                    printf("Label '%s' amount %0.2lf count %u average %0.2lf\n",
+                           labellist.label.str(),
+                           (double)labellist.total * .01,
+                           labellist.count,
+                           (double)labellist.total * .01 / (double)labellist.count);
+                }
+            }
 #endif
-			
-			if (fp.open("results.csv", "w")) {
-				fp.printf("Month");
 
-				for (i = 0; i < list.size(); i++) {
-					const transactionlist_t& labellist = *list[i];
+            if (fp.open("results.csv", "w")) {
+                fp.printf("Month");
 
-					if (labellist.count > 0) {
-						fp.printf(",\"%s\"", labellist.label.str());
-					}
-				}
+                for (i = 0; i < list.size(); i++) {
+                    const transactionlist_t& labellist = *list[i];
 
-				fp.printf("\n");
+                    if (labellist.count > 0) {
+                        fp.printf(",\"%s\"", labellist.label.str());
+                    }
+                }
 
-				for (j = 0; j < (months.size() - 1); j++) {
-					const size_t firsttrans = months[j];
-					const size_t lasttrans  = months[j + 1];
+                fp.printf("\n");
 
-					fp.printf("%s", transactions[firsttrans].date.DateFormat("%Y-%M-%D").str());
-					
-					for (i = 0; i < list.size(); i++) {
-						const transactionlist_t& labellist = *list[i];
+                for (j = 0; j < (months.size() - 1); j++) {
+                    const size_t firsttrans = months[j];
+                    const size_t lasttrans  = months[j + 1];
 
-						if (labellist.count > 0) {
-							uint32_t count = 0;
-							int64_t  total = 0;
+                    fp.printf("%s", transactions[firsttrans].date.DateFormat("%Y-%M-%D").str());
 
-							for (k = 0; k < labellist.list.size(); k++) {
-								size_t tran = labellist.list[k];
-								
-								if ((tran >= firsttrans) && (tran < lasttrans)) {
-									count++;
-									total += transactions[tran].amount;
-								}
-							}
+                    for (i = 0; i < list.size(); i++) {
+                        const transactionlist_t& labellist = *list[i];
 
-							fp.printf(",%0.2lf", (double)total * .01);
-						}
-					}
+                        if (labellist.count > 0) {
+                            uint32_t count = 0;
+                            int64_t  total = 0;
 
-					fp.printf("\n");
-				}
+                            for (k = 0; k < labellist.list.size(); k++) {
+                                size_t tran = labellist.list[k];
 
-				fp.close();
-			}
+                                if ((tran >= firsttrans) && (tran < lasttrans)) {
+                                    count++;
+                                    total += transactions[tran].amount;
+                                }
+                            }
 
-			if (fp.open("results.dat", "w")) {
-				const ADateTime startdt = ADateTime().StrToDate("1/4/2016");
-				ADateTime monthdt;
-				uint32_t lastmonth = ~0;
-				int32_t  total = 0, monthtotal = 0;
-				
-				for (i = 0; i < transactions.size(); i++) {
-					const transaction_t& trans = transactions[i];
+                            fp.printf(",%0.2lf", (double)total * .01);
+                        }
+                    }
 
-					if (trans.month != lastmonth) {
-						fp.printf("\n");
-						monthdt   = trans.date;
-						lastmonth = trans.month;
-						monthtotal = 0;
-					}
+                    fp.printf("\n");
+                }
 
-					total += trans.amount;
-					monthtotal += trans.amount;
+                fp.close();
+            }
 
-					if (monthdt >= startdt) {
-						fp.printf("%s %u %0.2f %0.2f %0.2f\n",
-								  monthdt.DateFormat("%D/%M/%Y").str(),
-								  trans.date.GetDays() - monthdt.GetDays(),
-								  (double)trans.amount * .01,
-								  (double)total * .01,
-								  (double)monthtotal * .01);
-					}
-				}
-				
-				fp.close();				
-			}
-		}
-	}
-	
-	return 0;
+            if (fp.open("results.dat", "w")) {
+                const ADateTime startdt = ADateTime().StrToDate("1/4/2016");
+                ADateTime monthdt;
+                uint32_t lastmonth = ~0;
+                int32_t  total = 0, monthtotal = 0;
+
+                for (i = 0; i < transactions.size(); i++) {
+                    const transaction_t& trans = transactions[i];
+
+                    if (trans.month != lastmonth) {
+                        fp.printf("\n");
+                        monthdt   = trans.date;
+                        lastmonth = trans.month;
+                        monthtotal = 0;
+                    }
+
+                    total += trans.amount;
+                    monthtotal += trans.amount;
+
+                    if (monthdt >= startdt) {
+                        fp.printf("%s %u %0.2f %0.2f %0.2f\n",
+                                  monthdt.DateFormat("%D/%M/%Y").str(),
+                                  trans.date.GetDays() - monthdt.GetDays(),
+                                  (double)trans.amount * .01,
+                                  (double)total * .01,
+                                  (double)monthtotal * .01);
+                    }
+                }
+
+                fp.close();
+            }
+        }
+    }
+
+    return 0;
 }

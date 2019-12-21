@@ -13,47 +13,47 @@ AQuitHandler quithandler;
 
 int main(int argc, char *argv[])
 {
-	AString filename = AString(getenv("HOME")).CatPath("cmdserver");
-	int i;
+    AString filename = AString(getenv("HOME")).CatPath("cmdserver");
+    int i;
 
-	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-c") == 0) filename = AString(argv[i]).Prefix();
-	}
-	
-	ASettingsHandler settings(filename, false);
-	ASocketServer    server;
-	AStdSocket       socket(server);
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-c") == 0) filename = AString(argv[i]).Prefix();
+    }
 
-	if (socket.open(settings.Get("addr", "0.0.0.0"),
-					(uint_t)settings.Get("port", "1722"),
-					ASocketServer::Type_Datagram)) {
-		while (!HasQuit()) {
-			if (settings.CheckRead()) {
-				printf("Configuration updated\n");
-				settings.Read();
-			}
+    ASettingsHandler settings(filename, false);
+    ASocketServer    server;
+    AStdSocket       socket(server);
 
-			server.Process(200);
+    if (socket.open(settings.Get("addr", "0.0.0.0"),
+                    (uint_t)settings.Get("port", "1722"),
+                    ASocketServer::Type_Datagram)) {
+        while (!HasQuit()) {
+            if (settings.CheckRead()) {
+                printf("Configuration updated\n");
+                settings.Read();
+            }
 
-			AString line;
-			while ((socket.bytesavailable() > 0) && (line.ReadLn(socket) >= 0)) {
-				AString cmd;
+            server.Process(200);
 
-				if ((cmd = settings.Get(line)).Valid()) {
-					cmd = (cmd
-						   .SearchAndReplace("{date}", ADateTime().DateFormat("%Y-%M-%D"))
-						   .SearchAndReplace("{user}", getenv("LOGNAME"))
-						   .SearchAndReplace("{home}", getenv("HOME")));
-					if (system(cmd + " &") != 0) {
-						fprintf(stderr, "Command '%s' failed\n", line.str());
-					}
-				}
-				else fprintf(stderr, "Unrecognized command '%s'\n", line.str());
-			}
-		}
-		
-		socket.close();
-	}
-	
-	return 0;
+            AString line;
+            while ((socket.bytesavailable() > 0) && (line.ReadLn(socket) >= 0)) {
+                AString cmd;
+
+                if ((cmd = settings.Get(line)).Valid()) {
+                    cmd = (cmd
+                           .SearchAndReplace("{date}", ADateTime().DateFormat("%Y-%M-%D"))
+                           .SearchAndReplace("{user}", getenv("LOGNAME"))
+                           .SearchAndReplace("{home}", getenv("HOME")));
+                    if (system(cmd + " &") != 0) {
+                        fprintf(stderr, "Command '%s' failed\n", line.str());
+                    }
+                }
+                else fprintf(stderr, "Unrecognized command '%s'\n", line.str());
+            }
+        }
+
+        socket.close();
+    }
+
+    return 0;
 }

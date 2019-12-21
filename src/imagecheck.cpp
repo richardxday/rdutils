@@ -10,29 +10,29 @@
 
 int main(int argc, char *argv[])
 {
-	int i;
+    int i;
 
-	for (i = 1; i < argc; i++) {
-		AStdFile fp;
+    for (i = 1; i < argc; i++) {
+        AStdFile fp;
 
-		if (fp.open(argv[i])) {
-			Exif exif;
-			
-			if (exif.DecodeExif(fp.GetFile())) {
-				const EXIFINFO *exifinfo = exif.m_exifinfo;
+        if (fp.open(argv[i])) {
+            Exif exif;
 
-				if (exifinfo && (exifinfo->CameraMake[0] || exifinfo->CameraModel[0])) {
-					AString cameramake(exifinfo->CameraMake, sizeof(exifinfo->CameraMake));
-					AString cameramodel(exifinfo->CameraModel, sizeof(exifinfo->CameraModel));
-					AString datetime(exifinfo->DateTime, sizeof(exifinfo->DateTime));
+            if (exif.DecodeExif(fp.GetFile())) {
+                const EXIFINFO *exifinfo = exif.m_exifinfo;
 
-					printf("%s: '%s' / '%s' : %s\n", argv[i], cameramake.str(), cameramodel.str(), datetime.str());
-				}
-			}			
-			
-			fp.close();
-		}
-	}
+                if (exifinfo && (exifinfo->CameraMake[0] || exifinfo->CameraModel[0])) {
+                    AString cameramake(exifinfo->CameraMake, sizeof(exifinfo->CameraMake));
+                    AString cameramodel(exifinfo->CameraModel, sizeof(exifinfo->CameraModel));
+                    AString datetime(exifinfo->DateTime, sizeof(exifinfo->DateTime));
 
-	return 0;
+                    printf("%s: '%s' / '%s' : %s\n", argv[i], cameramake.str(), cameramodel.str(), datetime.str());
+                }
+            }
+
+            fp.close();
+        }
+    }
+
+    return 0;
 }
