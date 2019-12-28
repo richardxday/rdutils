@@ -126,6 +126,16 @@ static bool __List(const FILE_INFO *file, void *Context)
         (!p->bFromTimeValid || (file->WriteTime >= p->FromTime)) &&
         (!p->bToTimeValid   || (file->WriteTime <= p->ToTime))) {
         AString str = p->FormatString, ostr, str2;
+        const struct {
+            const char *Text;
+            uint_t     Length;
+            uint_t     Mul;
+        } Fields[] = {
+            {"{left:",   (uint_t)strlen("{left:"),   0},
+            {"{centre:", (uint_t)strlen("{centre:"), 1},
+            {"{mid:",    (uint_t)strlen("{mid:"),    1},
+            {"{right:",  (uint_t)strlen("{right:"),  2},
+        };
 
         do {
             ostr = str;
@@ -296,16 +306,6 @@ static bool __List(const FILE_INFO *file, void *Context)
                 str = part1 + strs[2].Mid(pos, len) + part3;
             }
 
-            static const struct {
-                const char *Text;
-                uint_t     Length;
-                uint_t     Mul;
-            } Fields[] = {
-                {"{left:",   strlen("{left:"),   0},
-                {"{centre:", strlen("{centre:"), 1},
-                {"{mid:",    strlen("{mid:"),    1},
-                {"{right:",  strlen("{right:"),  2},
-            };
             uint_t i, j;
             for (i = 0; str[i];) {
                 if (str[i] == '{') {
