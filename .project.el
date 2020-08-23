@@ -11,7 +11,8 @@
              (flags . ("-xc++"
                        "-std=c++11"))
              (warnings . ("all"
-                          "extra"))
+                          "extra"
+                          "everything"))
              (packages . ("rdlib-0.1"))
              (sources . ("src"
                          "../rdlib/include"
