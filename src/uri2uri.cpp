@@ -14,13 +14,13 @@ int main(int argc, char *argv[])
 {
     AStdUri uri1, uri2, datauri;
     ASocketServer server;
-    uint8_t   *uri1to2buf = NULL;
-    uint8_t   *uri2to1buf = NULL;
+    uint8_t  *uri1to2buf = NULL;
+    uint8_t  *uri2to1buf = NULL;
     uint32_t updatetime = 500;
     uint_t   bufsize = 65536;
     uint_t   uri1bs = 1;
     uint_t   uri2bs = 1;
-    bool   reconnect = false;
+    bool     reconnect = false;
 
     int arg;
     for (arg = 1; arg < argc; arg++) {
@@ -62,14 +62,14 @@ int main(int argc, char *argv[])
         do {
             if (uri1.open(argv[arg])) {
                 if (uri2.open(argv[arg + 1], true)) {
-                    sint32_t n;
+                    slong_t  n;
                     uint_t   uri1to2pos = 0, uri2to1pos = 0;
                     uint32_t uri1to2rd  = 0, uri1to2wr  = 0;
                     uint32_t uri2to1rd  = 0, uri2to1wr  = 0;
                     uint32_t lastupdate = ::GetTickCount();
-                    bool   uri1clients = false;
-                    bool   uri2clients = false;
-                    bool   updated = false;
+                    bool     uri1clients = false;
+                    bool     uri2clients = false;
+                    bool     updated = false;
 
                     fprintf(stderr, "\nConnected!\n");
 
@@ -98,10 +98,10 @@ int main(int argc, char *argv[])
                         }
 
                         if ((n = uri1.bytesavailable()) > 0) {
-                            n  = MIN(n, (sint32_t)(bufsize - uri1to2pos));
+                            n  = MIN(n, (slong_t)(bufsize - uri1to2pos));
                             n -= n % uri1bs;
 
-                            if ((n = uri1.readbytes(uri1to2buf + uri1to2pos, n)) > 0) {
+                            if ((n = uri1.readbytes(uri1to2buf + uri1to2pos, (size_t)n)) > 0) {
                                 if (datauri.isopen()) {
                                     AString str;
                                     int i;
@@ -127,10 +127,10 @@ int main(int argc, char *argv[])
                         }
 
                         if ((n = uri2.bytesavailable()) > 0) {
-                            n  = MIN(n, (sint32_t)(bufsize - uri2to1pos));
+                            n  = MIN(n, (slong_t)(bufsize - uri2to1pos));
                             n -= n % uri2bs;
 
-                            if ((n = uri2.readbytes(uri2to1buf + uri2to1pos, n)) > 0) {
+                            if ((n = uri2.readbytes(uri2to1buf + uri2to1pos, (size_t)n)) > 0) {
                                 if (datauri.isopen()) {
                                     AString str;
                                     sint_t i;

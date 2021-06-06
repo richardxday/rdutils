@@ -87,6 +87,11 @@ LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
 OBJECTS		       := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
+APPLICATION	       := rota
+LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
+OBJECTS		       := $(APPLICATION:%=%.o)
+include $(MAKEFILEDIR)/makefile.app
+
 EXTRA_LIBS	 := $(DYNAMIC_EXTRA_LIBS)
 
 LOCAL_INSTALLED_BINARIES := $(shell find scripts -type f)
