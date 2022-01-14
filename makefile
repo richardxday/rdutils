@@ -16,80 +16,75 @@ DYNAMIC_EXTRA_LIBS := $(EXTRA_LIBS)
 
 INITIAL_COMMON_FLAGS := $(LOCAL_COMMON_FLAGS)
 
-APPLICATION	       := etagswrapper
+APPLICATION		   := etagswrapper
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := agrep
+APPLICATION		   := agrep
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := cmdsender
+APPLICATION		   := cmdsender
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := cmdserver
+APPLICATION		   := cmdserver
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := list
+APPLICATION		   := list
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := uri2uri
+APPLICATION		   := uri2uri
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := imagediff
+APPLICATION		   := imagediff
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o) ImageDiffer.o
+OBJECTS			   := $(APPLICATION:%=%.o) ImageDiffer.o
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := srttracker
+APPLICATION		   := srttracker
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := sqlloganalyzer
+APPLICATION		   := sqlloganalyzer
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := accounts
+APPLICATION		   := accounts
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := countsmswords
+APPLICATION		   := countsmswords
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION	       := multilogger
+APPLICATION		   := multilogger
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
 # APPLICATION  := userdicgenerator
-# OBJECTS	         := $(APPLICATION:%=%.o)
+# OBJECTS			 := $(APPLICATION:%=%.o)
 # include $(MAKEFILEDIR)/makefile.app
 
 EXTRA_LIBS	 := $(call staticlib,$(EXTRA_LIBS),rdlib)
 
-APPLICATION	       := picprojectdb
+APPLICATION		   := picprojectdb
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS		       := $(APPLICATION:%=%.o)
-include $(MAKEFILEDIR)/makefile.app
-
-APPLICATION	       := rota
-LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS		       := $(APPLICATION:%=%.o)
+OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
 EXTRA_LIBS	 := $(DYNAMIC_EXTRA_LIBS)
