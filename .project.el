@@ -1,6 +1,5 @@
 (c++-mode . ((filetypes . (cpp-project))
              (includes . ("accounts"
-                          "agrep"
                           "cmdsender"
                           "cmdserver"
                           "countsmswords"

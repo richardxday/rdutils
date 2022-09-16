@@ -21,11 +21,6 @@ LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
 OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION		   := agrep
-LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS			   := $(APPLICATION:%=%.o)
-include $(MAKEFILEDIR)/makefile.app
-
 APPLICATION		   := cmdsender
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
 OBJECTS			   := $(APPLICATION:%=%.o)
@@ -51,22 +46,7 @@ LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
 OBJECTS			   := $(APPLICATION:%=%.o) ImageDiffer.o
 include $(MAKEFILEDIR)/makefile.app
 
-APPLICATION		   := srttracker
-LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS			   := $(APPLICATION:%=%.o)
-include $(MAKEFILEDIR)/makefile.app
-
-APPLICATION		   := sqlloganalyzer
-LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS			   := $(APPLICATION:%=%.o)
-include $(MAKEFILEDIR)/makefile.app
-
 APPLICATION		   := accounts
-LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
-OBJECTS			   := $(APPLICATION:%=%.o)
-include $(MAKEFILEDIR)/makefile.app
-
-APPLICATION		   := countsmswords
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS) -I$(APPLICATION)
 OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
@@ -75,19 +55,6 @@ APPLICATION		   := multilogger
 LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
 OBJECTS			   := $(APPLICATION:%=%.o)
 include $(MAKEFILEDIR)/makefile.app
-
-# APPLICATION  := userdicgenerator
-# OBJECTS			 := $(APPLICATION:%=%.o)
-# include $(MAKEFILEDIR)/makefile.app
-
-EXTRA_LIBS	 := $(call staticlib,$(EXTRA_LIBS),rdlib)
-
-APPLICATION		   := picprojectdb
-LOCAL_COMMON_FLAGS := $(INITIAL_COMMON_FLAGS)
-OBJECTS			   := $(APPLICATION:%=%.o)
-include $(MAKEFILEDIR)/makefile.app
-
-EXTRA_LIBS	 := $(DYNAMIC_EXTRA_LIBS)
 
 LOCAL_INSTALLED_BINARIES := $(shell find scripts -type f)
 LOCAL_INSTALLED_BINARIES := $(LOCAL_INSTALLED_BINARIES:scripts/%=$(INSTALLBINDST)/%)
