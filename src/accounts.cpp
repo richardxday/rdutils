@@ -274,14 +274,12 @@ int main(int argc, char *argv[])
                         const transactionlist_t& labellist = *list[i];
 
                         if (labellist.count > 0) {
-                            uint32_t count = 0;
-                            int64_t  total = 0;
+                            int64_t total = 0;
 
                             for (k = 0; k < labellist.list.size(); k++) {
                                 size_t tran = labellist.list[k];
 
                                 if ((tran >= firsttrans) && (tran < lasttrans)) {
-                                    count++;
                                     total += transactions[tran].amount;
                                 }
                             }
