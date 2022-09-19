@@ -64,45 +64,45 @@ int main(int argc, char *argv[])
             "Subcategory",
             "Memo",
         };
-        static const AString  anyregex      = ParseRegex("*");
-        static const AString  directdeposit = ParseRegex("directdep");
-        static const AString  directdebit   = ParseRegex("(directdebit)|(repeatpmt)");
-        static const AString  payment       = ParseRegex("payment");
-        static const AString  fundstransfer = ParseRegex("ft");
-        static const AString  cash          = ParseRegex("cash");
+        static const AString  anyregex      = ParseGlob("*");
+        static const AString  directdeposit = ParseGlob("directdep");
+        static const AString  directdebit   = ParseGlob("(directdebit)|(repeatpmt)");
+        static const AString  payment       = ParseGlob("payment");
+        static const AString  fundstransfer = ParseGlob("ft");
+        static const AString  cash          = ParseGlob("cash");
         static const filter_t filters[] = {
-            {false,  true,  false, anyregex,              anyregex,                             "Outgoings"},
+            {false,  true,  false, anyregex,              anyregex,                            "Outgoings"},
 
-            { true,  true,  false, directdeposit,         ParseRegex("bbc monthly*"),           "Salary"},
-            { true,  true,  false, directdeposit,         ParseRegex("mt safeline*"),           "Salary"},
-            { true,  true,  false, directdeposit,         ParseRegex("*edmondson*"),            "Gail"},
-            { true,  true,  true,  directdeposit,         ParseRegex("*bbc*"),                  "BBC Expenses"},
-            { true,  true,  true,  directdeposit,         ParseRegex("*"),                      ""},
+            { true,  true,  false, directdeposit,         ParseGlob("bbc monthly*"),           "Salary"},
+            { true,  true,  false, directdeposit,         ParseGlob("mt safeline*"),           "Salary"},
+            { true,  true,  false, directdeposit,         ParseGlob("*edmondson*"),            "Gail"},
+            { true,  true,  true,  directdeposit,         ParseGlob("*bbc*"),                  "BBC Expenses"},
+            { true,  true,  true,  directdeposit,         ParseGlob("*"),                      ""},
 
-            { true,  true,  false, directdebit,           ParseRegex("*"),                      "Bills"},
-            { true,  true,  false, directdebit,           ParseRegex("*"),                      ""},
+            { true,  true,  false, directdebit,           ParseGlob("*"),                      "Bills"},
+            { true,  true,  false, directdebit,           ParseGlob("*"),                      ""},
 
-            { true,  true,  false, payment,               ParseRegex("nowtv.com*"),             "Bills"},
-            { true,  true,  false, payment,               ParseRegex("nowtv.com*"),             "NOW TV"},
-            { true,  true,  false, payment,               ParseRegex("google*"),                "Google"},
+            { true,  true,  false, payment,               ParseGlob("nowtv.com*"),             "Bills"},
+            { true,  true,  false, payment,               ParseGlob("nowtv.com*"),             "NOW TV"},
+            { true,  true,  false, payment,               ParseGlob("google*"),                "Google"},
 
-            { true,  true,  false, payment,               ParseRegex("*peel media*"),           "Bills"},
+            { true,  true,  false, payment,               ParseGlob("*peel media*"),           "Bills"},
 
-            { true,  true,  false, fundstransfer,         ParseRegex("*83111512*"),             "Mortgate Transfers"},
+            { true,  true,  false, fundstransfer,         ParseGlob("*83111512*"),             "Mortgate Transfers"},
 
-            { true,  true,  false, cash,                  ParseRegex("*"),                      "Cash"},
+            { true,  true,  false, cash,                  ParseGlob("*"),                      "Cash"},
 
-            { true,  true,  false, payment,               ParseRegex("*amazon*"),               "Amazon"},
-            { true,  true,  false, payment,               ParseRegex("*paypal*"),               "PayPal"},
-            { true,  true,  false, payment,               ParseRegex("*tesco*"),                "Tesco"},
-            { true,  true,  false, payment,               ParseRegex("*asda*"),                 "Asda"},
-            { true,  true,  false, payment,               ParseRegex("*sainsburys*"),           "Sainsburys"},
-            { true,  true,  false, payment,               ParseRegex("*santaspizza*"),          "Santas"},
-            { true,  true,  false, payment,               ParseRegex("*mcdonalds*"),            "McDonalds"},
-            { true,  true,  false, payment,               ParseRegex("*kwik fit*"),             "Kwik Fit"},
+            { true,  true,  false, payment,               ParseGlob("*amazon*"),               "Amazon"},
+            { true,  true,  false, payment,               ParseGlob("*paypal*"),               "PayPal"},
+            { true,  true,  false, payment,               ParseGlob("*tesco*"),                "Tesco"},
+            { true,  true,  false, payment,               ParseGlob("*asda*"),                 "Asda"},
+            { true,  true,  false, payment,               ParseGlob("*sainsburys*"),           "Sainsburys"},
+            { true,  true,  false, payment,               ParseGlob("*santaspizza*"),          "Santas"},
+            { true,  true,  false, payment,               ParseGlob("*mcdonalds*"),            "McDonalds"},
+            { true,  true,  false, payment,               ParseGlob("*kwik fit*"),             "Kwik Fit"},
 
-            {false,  true,  true,  ParseRegex("*"),       ParseRegex("*"),                      "Other Payments"},
-            { true, false,  true,  ParseRegex("*"),       ParseRegex("*"),                      "Other Receipts"},
+            {false,  true,  true,  ParseGlob("*"),        ParseGlob("*"),                      "Other Payments"},
+            { true, false,  true,  ParseGlob("*"),        ParseGlob("*"),                      "Other Receipts"},
         };
         std::vector<AString>       columnlist;
         std::map<AString,size_t>   columnmap;
@@ -201,8 +201,8 @@ int main(int argc, char *argv[])
 
                     if (((filter.allowpositive && (trans.amount > 0)) ||
                          (filter.allownegative && (trans.amount < 0))) &&
-                        MatchRegex(trans.type, filter.type) &&
-                        MatchRegex(trans.desc, filter.desc) &&
+                        MatchGlob(trans.type, filter.type) &&
+                        MatchGlob(trans.desc, filter.desc) &&
                         !addedtolabel[label] &&
                         (!count || !filter.unused)) {
                         transactionlist_t& list = transtypes[label];
