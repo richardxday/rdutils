@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
                 settings.Read();
             }
 
-            server.Process(200);
+            server.Process(1000);
 
             AString line;
             while ((socket.bytesavailable() > 0) && (line.ReadLn(socket) >= 0)) {
@@ -44,12 +44,14 @@ int main(int argc, char *argv[])
                            .SearchAndReplace("{date}", ADateTime().DateFormat("%Y-%M-%D"))
                            .SearchAndReplace("{user}", getenv("LOGNAME"))
                            .SearchAndReplace("{home}", getenv("HOME")));
-                    if (system(cmd + " &") != 0) {
+                    if (system(cmd + " </dev/null &") != 0) {
                         fprintf(stderr, "Command '%s' failed\n", line.str());
                     }
                 }
                 else fprintf(stderr, "Unrecognized command '%s'\n", line.str());
             }
+
+            fflush(stdout);
         }
 
         socket.close();
