@@ -9,6 +9,8 @@
 
 #include "cmdserver_private.h"
 
+#define DEBUG_PROCESS 0
+
 AQuitHandler quithandler;
 
 int main(int argc, char *argv[])
@@ -33,7 +35,18 @@ int main(int argc, char *argv[])
                 settings.Read();
             }
 
-            server.Process(1000);
+#if DEBUG_PROCESS
+            uint32_t tick = GetTickCount(), diff;
+#endif
+
+            int res = server.Process(1000);
+            if (res < 0) break;
+
+#if DEBUG_PROCESS
+            if ((diff = GetTickCount() - tick) < 1000) {
+                debug("Process took %ums\n", diff);
+            }
+#endif
 
             AString line;
             while ((socket.bytesavailable() > 0) && (line.ReadLn(socket) >= 0)) {
@@ -44,7 +57,7 @@ int main(int argc, char *argv[])
                            .SearchAndReplace("{date}", ADateTime().DateFormat("%Y-%M-%D"))
                            .SearchAndReplace("{user}", getenv("LOGNAME"))
                            .SearchAndReplace("{home}", getenv("HOME")));
-                    if (system(cmd + " </dev/null &") != 0) {
+                    if (system(cmd + " &") != 0) {
                         fprintf(stderr, "Command '%s' failed\n", line.str());
                     }
                 }
