@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
             if (fp.open(argv[i])) {
                 AString str;
 
-                while (str.ReadLn(fp)) {
+                while (str.ReadLn(fp) >= 0) {
                     auto crc = CRC32((const uint8_t *)str.str(), (uint32_t)str.len());
                     if (map.find(crc) == map.end())
                     {
